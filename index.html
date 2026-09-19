@@ -77,6 +77,7 @@
   .file-btn { position:relative; overflow:hidden; display:inline-block; }
   .file-btn input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; }
   .footnote { font-size:11px; color: var(--ink-faint); margin-top:14px; line-height:1.5; }
+  #autoSaveStatus { color: var(--good); font-weight:600; margin-top:14px; margin-bottom:0; }
 
   /* Main */
   .main { flex:1; min-width:0; display:flex; flex-direction:column; }
@@ -185,7 +186,8 @@
       <label class="btn ghost file-btn">⬆ Carregar arquivo salvo<input type="file" id="loadFileInput" accept="application/json"></label>
       <button class="btn ghost" id="backupBtn">⬇ Baixar backup de todos</button>
     </div>
-    <div class="footnote">Protótipo — os dados ficam só nesta aba enquanto ela está aberta. Salve cada etapa (baixa um arquivo) ou baixe o backup completo; carregue de volta pra continuar depois.</div>
+    <div class="footnote" id="autoSaveStatus">Autosalvamento neste navegador ativado.</div>
+    <div class="footnote">O autosalvamento guarda os dados neste navegador/aparelho (não sincroniza entre dispositivos). Pra levar os dados pra outro aparelho, ou ter uma cópia garantida, use "Salvar etapa" ou "Baixar backup de todos".</div>
   </aside>
 
   <main class="main" id="mainContentEl"></main>
@@ -228,6 +230,47 @@
   let activeId = null;
   let activeStep = STEPS[0].id;
 
+  // -----------------------------------------------------------------------
+  // Autosave local (rede de segurança) — guarda patients/records no
+  // navegador (localStorage) sempre que algo muda, além do salvamento
+  // manual em .json. Não sincroniza entre aparelhos, mas evita perder
+  // dados se a aba fechar/atualizar sem querer.
+  // -----------------------------------------------------------------------
+  const STORAGE_KEY = "consulta_guiada_autosave_v1";
+  let autoSaveTimer = null;
+  let suppressStatusUntil = 0;
+  function autoSaveStatusEl(){ return document.getElementById("autoSaveStatus"); }
+  function formatHora(d){ return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
+  function persistState(){
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ patients, records, activeId, activeStep, savedAt: new Date().toISOString() }));
+      const el = autoSaveStatusEl();
+      if(el && Date.now() > suppressStatusUntil) el.textContent = "Salvo automaticamente às " + formatHora(new Date());
+    } catch(e) {
+      const el = autoSaveStatusEl();
+      if(el) el.textContent = "Autosalvamento indisponível neste navegador — use o botão Salvar de cada etapa.";
+    }
+  }
+  function autoSave(){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(persistState, 400);
+  }
+  function loadPersistedState(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return false;
+      const parsed = JSON.parse(raw);
+      if(!parsed || !Array.isArray(parsed.patients) || typeof parsed.records !== "object") return false;
+      patients = parsed.patients;
+      records = parsed.records;
+      if(parsed.activeId && patients.find(p => p.id === parsed.activeId)) activeId = parsed.activeId;
+      if(parsed.activeStep) activeStep = parsed.activeStep;
+      return true;
+    } catch(e) {
+      return false;
+    }
+  }
+
   function uid(){ return "PAC" + String(Math.floor(1000 + (patients.length * 137 + 53) % 8999)).slice(0,3) + Date.now().toString().slice(-3); }
   function escapeHtml(str){
     return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -259,7 +302,7 @@
       patientListEl.appendChild(li);
     });
   }
-  function selectPatient(id){ activeId = id; activeStep = STEPS[0].id; renderPatientList(); renderMain(); }
+  function selectPatient(id){ activeId = id; activeStep = STEPS[0].id; persistState(); renderPatientList(); renderMain(); }
 
   function stepDone(record, stepId){
     const r = record || {};
@@ -300,7 +343,7 @@
       const el = document.createElement("div");
       el.className = "step-pill" + (s.id === activeStep ? " active" : "") + (stepDone(record, s.id) ? " done" : "");
       el.innerHTML = `<span class="n">${stepDone(record, s.id) && s.id !== activeStep ? "✓" : s.num}</span>${s.label}`;
-      el.addEventListener("click", () => { activeStep = s.id; renderMain(); });
+      el.addEventListener("click", () => { activeStep = s.id; persistState(); renderMain(); });
       stepNavEl.appendChild(el);
     });
     document.getElementById("printBtn").addEventListener("click", () => window.print());
@@ -309,6 +352,7 @@
       patients = patients.filter(p => p.id !== activeId);
       delete records[activeId];
       activeId = null;
+      persistState();
       renderPatientList(); renderMain();
     });
     const panelEl = document.getElementById("stepPanelEl");
@@ -391,7 +435,7 @@
         labs: rows,
       };
     }
-    function sync(){ record.objetivos = readData(); }
+    function sync(){ record.objetivos = readData(); autoSave(); }
     function bind(){
       ["ob_peso","ob_altura","ob_idade","ob_sexo","ob_pa_sist","ob_pa_diast"].forEach(id => {
         const el = document.getElementById(id);
@@ -508,7 +552,7 @@
         ${diag.linhas.map(l => `<div class="diag-line">${l}</div>`).join("")}
       </div>`;
     }
-    function sync(){ record.bia = readData(); }
+    function sync(){ record.bia = readData(); autoSave(); }
     ids.forEach(id => { const el = document.getElementById(id); el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
     sync();
     refresh();
@@ -688,7 +732,7 @@
       const s = computeSuggestions(readData());
       document.getElementById("spResultBox").innerHTML = `<div class="diag-box">${s.map(t=>`<div class="diag-line">${t}</div>`).join("")}</div>`;
     }
-    function sync(){ record.suplementacao = readData(); }
+    function sync(){ record.suplementacao = readData(); autoSave(); }
     ids.forEach(id => { const el = document.getElementById(id); el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
     sync(); refresh();
     document.getElementById("spSaveBtn").addEventListener("click", () => {
@@ -752,7 +796,7 @@
       const s = computeSuggestions(readData());
       document.getElementById("esResultBox").innerHTML = `<div class="diag-box">${s.map(t=>`<div class="diag-line">${t}</div>`).join("")}</div>`;
     }
-    function sync(){ record.esportiva = readData(); }
+    function sync(){ record.esportiva = readData(); autoSave(); }
     ids.forEach(id => { const el = document.getElementById(id); el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
     sync(); refresh();
     document.getElementById("esSaveBtn").addEventListener("click", () => {
@@ -813,7 +857,7 @@
       const s = computeSuggestions(readData());
       document.getElementById("pmResultBox").innerHTML = `<div class="diag-box">${s.map(t=>`<div class="diag-line">${t}</div>`).join("")}</div>`;
     }
-    function sync(){ record.perimenopausa = readData(); }
+    function sync(){ record.perimenopausa = readData(); autoSave(); }
     ids.forEach(id => { const el = document.getElementById(id); el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
     sync(); refresh();
     document.getElementById("pmSaveBtn").addEventListener("click", () => {
@@ -859,7 +903,7 @@
       if(!s.length){ s.push("Preencha os campos acima pra ver a triagem específica desta paciente."); }
       document.getElementById("fdResultBox").innerHTML = `<div class="diag-box">${s.map(t=>`<div class="diag-line">${t}</div>`).join("")}</div>`;
     }
-    function sync(){ record.fadiga = readData(); }
+    function sync(){ record.fadiga = readData(); autoSave(); }
     container.querySelectorAll("input, select").forEach(el => { el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
     sync(); refresh();
     document.getElementById("fdSaveBtn").addEventListener("click", () => {
@@ -951,7 +995,7 @@
         },
       };
     }
-    function sync(){ record.perfil = readData(); }
+    function sync(){ record.perfil = readData(); autoSave(); }
     panelEl.querySelectorAll("input, select").forEach(el => {
       el.addEventListener("input", sync);
       el.addEventListener("change", sync);
@@ -1215,7 +1259,7 @@
       box.innerHTML = html;
       box.querySelectorAll(".meal-edit-input").forEach(inp => inp.addEventListener("input", () => { mealOverrides[inp.getAttribute("data-meal")] = inp.value; sync(); }));
     }
-    function sync(){ const data = readData(); const r = computeCalculadora(data); record.calculadora = Object.assign({}, data, { resultado: r, mealOverrides: Object.assign({}, mealOverrides) }); }
+    function sync(){ const data = readData(); const r = computeCalculadora(data); record.calculadora = Object.assign({}, data, { resultado: r, mealOverrides: Object.assign({}, mealOverrides) }); autoSave(); }
     function refresh(){
       const data = readData();
       const r = computeCalculadora(data);
@@ -1311,7 +1355,7 @@
         <span class="save-status" id="saveStatus"></span>
       </div>
     `;
-    function sync(){ record.orientacoes = { texto: document.getElementById("or_texto").value }; }
+    function sync(){ record.orientacoes = { texto: document.getElementById("or_texto").value }; autoSave(); }
     document.getElementById("or_texto").addEventListener("input", sync);
     sync();
     document.getElementById("regenBtn").addEventListener("click", () => {
@@ -1346,6 +1390,7 @@
     patients.push({ id, name, birth });
     records[id] = {};
     modalOverlay.classList.remove("show");
+    persistState();
     renderPatientList();
     selectPatient(id);
   });
@@ -1377,6 +1422,7 @@
           else if(parsed.etapa === "calculadora") records[parsed.paciente].calculadora = parsed.dados;
           else if(parsed.etapa === "orientacoes") records[parsed.paciente].orientacoes = parsed.dados;
         }
+        persistState();
         renderPatientList(); renderMain();
         alert("Arquivo carregado com sucesso.");
       } catch(err){
@@ -1388,8 +1434,17 @@
   });
   searchInput.addEventListener("input", renderPatientList);
 
+  const restored = loadPersistedState();
   renderPatientList();
   renderMain();
+  if(restored){
+    suppressStatusUntil = Date.now() + 4000;
+    const st = autoSaveStatusEl();
+    if(st) st.textContent = "Dados restaurados deste navegador (autosalvamento).";
+  }
+  // Rede de segurança adicional: revalida o autosalvamento a cada 20s,
+  // mesmo que algum campo específico não tenha disparado sync().
+  setInterval(persistState, 20000);
 })();
 </script>
 </body>

@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulta Guiada — Nutrologia</title>
+<style>
+  :root {
+    --bg:        #FAF9F6;
+    --surface:   #FFFFFF;
+    --border:    #E7E4DD;
+    --border-soft: #F0EEE8;
+    --ink:       #24231F;
+    --ink-soft:  #6E6B62;
+    --ink-faint: #A9A69C;
+    --accent:      #B3654A;
+    --accent-soft: #F3E4DA;
+    --accent-dark: #8F4E38;
+    --good:      #3F7A5C;
+    --good-soft: #E4EEE7;
+    --warn:      #B3843A;
+    --warn-soft: #F5ECDD;
+    --bad:       #B34A3F;
+    --bad-soft:  #F6E4E1;
+    --radius: 10px;
+    --radius-sm: 7px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .app { display:flex; min-height:100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 22px 18px;
+    display:flex; flex-direction:column;
+  }
+  .sidebar .brand { font-size: 15px; font-weight: 700; letter-spacing:.2px; margin-bottom:2px; }
+  .sidebar .brand-sub { font-size: 11px; color: var(--ink-faint); text-transform:uppercase; letter-spacing:.6px; margin-bottom:20px; }
+  .search-input {
+    width:100%; padding:9px 11px; border:1px solid var(--border); border-radius: var(--radius-sm);
+    font-size:13px; background: var(--bg); color: var(--ink); margin-bottom:16px;
+  }
+  .search-input:focus { outline:none; border-color: var(--accent); }
+  .section-label { font-size:10.5px; color: var(--ink-faint); text-transform:uppercase; letter-spacing:.6px; margin: 4px 0 8px; }
+  .patient-list { list-style:none; margin:0; padding:0; flex:1; overflow-y:auto; }
+  .patient-row {
+    padding:10px 11px; border-radius: var(--radius-sm); cursor:pointer; margin-bottom:4px;
+    border:1px solid transparent;
+  }
+  .patient-row:hover { background: var(--bg); }
+  .patient-row.active { background: var(--accent-soft); border-color: var(--accent); }
+  .patient-row .pname { font-weight:600; font-size:13px; }
+  .patient-row .pmeta { font-size:11.5px; color: var(--ink-faint); margin-top:1px; }
+  .sidebar-actions { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+  .btn {
+    font-family:inherit; font-size:12.5px; font-weight:600; padding:9px 14px; border-radius: var(--radius-sm);
+    border:1px solid var(--border); background: var(--surface); color: var(--ink); cursor:pointer;
+    transition: background .12s;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color:#fff; }
+  .btn.primary:hover { background: var(--accent-dark); }
+  .btn.ghost { background:transparent; border-color: var(--border); }
+  .btn.danger { color: var(--bad); border-color:#e6cbc6; }
+  .btn.small { padding:6px 10px; font-size:11.5px; }
+  .file-btn { position:relative; overflow:hidden; display:inline-block; }
+  .file-btn input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .footnote { font-size:11px; color: var(--ink-faint); margin-top:14px; line-height:1.5; }
+
+  /* Main */
+  .main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .patient-header {
+    padding: 22px 32px 14px; display:flex; justify-content:space-between; align-items:flex-start;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .patient-header h1 { font-size:19px; margin:0 0 3px; font-weight:700; }
+  .patient-header .meta { font-size:12px; color: var(--ink-faint); }
+  .header-actions { display:flex; gap:8px; }
+
+  .step-nav { display:flex; gap:2px; padding: 14px 32px 0; border-bottom:1px solid var(--border-soft); overflow-x:auto; }
+  .step-pill {
+    display:flex; align-items:center; gap:7px; padding:9px 14px; font-size:12.5px; font-weight:600;
+    color: var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap;
+  }
+  .step-pill .n {
+    width:19px; height:19px; border-radius:50%; background: var(--border-soft); color: var(--ink-faint);
+    display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:700; flex-shrink:0;
+  }
+  .step-pill.active { color: var(--accent-dark); border-bottom-color: var(--accent); }
+  .step-pill.active .n { background: var(--accent); color:#fff; }
+  .step-pill.done .n { background: var(--good-soft); color: var(--good); }
+
+  .step-panel { flex:1; padding: 26px 32px 60px; max-width: 880px; }
+  .step-title { font-size:17px; font-weight:700; margin:0 0 4px; }
+  .step-sub { font-size:12.5px; color: var(--ink-soft); margin: 0 0 20px; max-width:640px; }
+
+  .field-grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px 18px; }
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field label { font-size:12px; font-weight:600; color: var(--ink-soft); }
+  .field label.checkbox-label { display:flex; align-items:flex-start; gap:8px; font-weight:600; color:var(--ink); cursor:pointer; }
+  .field input[type=text], .field input[type=number], .field select, .field textarea {
+    font-family:inherit; font-size:13px; padding:9px 11px; border:1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--ink); width:100%;
+  }
+  .field textarea { min-height:70px; resize:vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline:none; border-color: var(--accent); }
+
+  .card { background: var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding:18px 20px; margin-bottom:16px; }
+  .card-head { font-size:12.5px; font-weight:700; color: var(--ink); margin-bottom:10px; text-transform:uppercase; letter-spacing:.4px; }
+
+  .diag-box { border-radius: var(--radius); padding:16px 18px; margin: 14px 0; border:1px solid var(--border); background: var(--surface); }
+  .diag-headline { font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .diag-badge { display:inline-block; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px; text-transform:uppercase; letter-spacing:.3px; }
+  .diag-badge.ok { background: var(--good-soft); color: var(--good); }
+  .diag-badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .diag-badge.bad { background: var(--bad-soft); color: var(--bad); }
+  .diag-line { font-size:12.5px; color: var(--ink-soft); padding:7px 0; border-top:1px dashed var(--border); }
+  .diag-line:first-of-type { border-top:none; }
+
+  .lab-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .lab-table th { text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color: var(--ink-faint); padding:0 8px 8px; border-bottom:1px solid var(--border); }
+  .lab-table td { padding:6px 8px; border-bottom:1px solid var(--border-soft); }
+  .lab-table input { width:100%; font-family:inherit; font-size:12.5px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--ink); }
+  .flag { font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; }
+  .flag.ok { background: var(--good-soft); color: var(--good); }
+  .flag.low { background: var(--warn-soft); color: var(--warn); }
+  .flag.high { background: var(--bad-soft); color: var(--bad); }
+
+  .save-row { display:flex; align-items:center; gap:12px; margin-top:22px; padding-top:16px; border-top:1px solid var(--border-soft); flex-wrap:wrap; }
+  .save-status { font-size:12px; color: var(--good); }
+
+  .queixa-card { border:1px solid var(--border); border-radius: var(--radius); margin-bottom:12px; overflow:hidden; }
+  .queixa-head { padding:14px 18px; display:flex; align-items:center; gap:10px; background: var(--surface); cursor:pointer; }
+  .queixa-head input[type=checkbox] { width:16px; height:16px; accent-color: var(--accent); flex-shrink:0; }
+  .queixa-head .qtitle { font-size:13.5px; font-weight:700; flex:1; }
+  .queixa-body { padding: 0 18px 16px; background: var(--surface); }
+  .queixa-quick { background: var(--accent-soft); border-radius: var(--radius-sm); padding:12px 14px; margin-top:2px; }
+  .queixa-quick .qline { font-size:12.5px; color: var(--accent-dark); padding:4px 0; }
+  .aprofundar-toggle { font-size:12px; font-weight:700; color: var(--accent-dark); cursor:pointer; margin-top:10px; display:inline-block; }
+  .aprofundar-panel { margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); display:none; }
+  .aprofundar-panel.open { display:block; }
+
+  .subhead { font-size:12px; font-weight:700; color: var(--ink); margin: 16px 0 8px; text-transform:uppercase; letter-spacing:.3px; }
+  .checkbox-inline { display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:400; color:var(--ink); }
+  .checkbox-inline input { accent-color: var(--accent); }
+
+  .source-note { font-size:11px; color: var(--ink-faint); margin-top:18px; line-height:1.5; }
+  .empty-hint { font-size:12.5px; color: var(--ink-faint); padding:14px 0; }
+
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(36,35,31,.35); align-items:center; justify-content:center; z-index:50; }
+  .modal-overlay.show { display:flex; }
+  .modal-box { background: var(--surface); border-radius: var(--radius); padding:22px 24px; width:340px; }
+  .modal-box h3 { margin:0 0 14px; font-size:15px; }
+  .modal-box .field { margin-bottom:12px; }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+
+  .disclaimer-bar { padding:12px 32px; font-size:11px; color: var(--ink-faint); border-top:1px solid var(--border-soft); text-align:center; }
+
+  @media (max-width: 860px) {
+    .field-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">Consulta Guiada</div>
+    <div class="brand-sub">Nutrologia · apoio pessoal</div>
+    <input class="search-input" id="searchInput" type="text" placeholder="Buscar por código/iniciais...">
+    <div class="section-label">Pacientes</div>
+    <ul class="patient-list" id="patientList"></ul>
+    <div class="sidebar-actions">
+      <button class="btn primary" id="addPatientBtn">+ Novo paciente</button>
+      <label class="btn ghost file-btn">⬆ Carregar arquivo salvo<input type="file" id="loadFileInput" accept="application/json"></label>
+      <button class="btn ghost" id="backupBtn">⬇ Baixar backup de todos</button>
+    </div>
+    <div class="footnote">Protótipo — os dados ficam só nesta aba enquanto ela está aberta. Salve cada etapa (baixa um arquivo) ou baixe o backup completo; carregue de volta pra continuar depois.</div>
+  </aside>
+
+  <main class="main" id="mainContentEl"></main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <h3>Nova paciente</h3>
+    <div class="field"><label>Código / iniciais (ex.: PAC003 · M.A.)</label><input type="text" id="newName"></div>
+    <div class="field"><label>Data de nascimento (opcional)</label><input type="text" id="newBirth" placeholder="dd/mm/aaaa"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelAdd">Cancelar</button>
+      <button class="btn primary" id="confirmAdd">Criar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STEPS = [
+    { id: "objetivos",   num: "1", label: "Dados objetivos" },
+    { id: "bia",         num: "2", label: "Composição corporal" },
+    { id: "perfil",      num: "3", label: "Queixas & hábitos" },
+    { id: "conduta",     num: "4", label: "Conduta & suplementação" },
+    { id: "plano",       num: "5", label: "Plano alimentar" },
+    { id: "orientacoes", num: "6", label: "Orientações pra casa" },
+  ];
+  const LAB_DEFAULTS = [
+    { nome: "Hemoglobina", unidade: "g/dL", min: "12", max: "16", valor: "", data: "" },
+    { nome: "Ferritina", unidade: "ng/mL", min: "20", max: "250", valor: "", data: "" },
+    { nome: "Vitamina B12", unidade: "pg/mL", min: "200", max: "900", valor: "", data: "" },
+    { nome: "Vitamina D (25-OH)", unidade: "ng/mL", min: "30", max: "100", valor: "", data: "" },
+    { nome: "TSH", unidade: "µUI/mL", min: "0.4", max: "4.0", valor: "", data: "" },
+    { nome: "Glicemia de jejum", unidade: "mg/dL", min: "70", max: "99", valor: "", data: "" },
+    { nome: "HbA1c", unidade: "%", min: "4.0", max: "5.6", valor: "", data: "" },
+  ];
+
+  let patients = [{ id: "PAC001", name: "PAC001 · J.S.", birth: "15/03/1985" }];
+  let records = { PAC001: {} };
+  let activeId = null;
+  let activeStep = STEPS[0].id;
+
+  function uid(){ return "PAC" + String(Math.floor(1000 + (patients.length * 137 + 53) % 8999)).slice(0,3) + Date.now().toString().slice(-3); }
+  function escapeHtml(str){
+    return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+  function num(v){ const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? null : n; }
+  function opt(val, cur){ return `<option value="${val}" ${val===cur?"selected":""}>${val}</option>`; }
+  function downloadJSON(filename, dataObj){
+    const blob = new Blob([JSON.stringify(dataObj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const searchInput = document.getElementById("searchInput");
+  const patientListEl = document.getElementById("patientList");
+  const mainContentEl = document.getElementById("mainContentEl");
+  const modalOverlay = document.getElementById("modalOverlay");
+
+  function renderPatientList(){
+    const q = (searchInput.value || "").toLowerCase();
+    patientListEl.innerHTML = "";
+    patients.filter(p => p.name.toLowerCase().includes(q)).forEach(p => {
+      const li = document.createElement("li");
+      li.className = "patient-row" + (p.id === activeId ? " active" : "");
+      li.innerHTML = `<div class="pname">${escapeHtml(p.name)}</div><div class="pmeta">${p.birth ? "Nasc. " + escapeHtml(p.birth) : "Sem data"}</div>`;
+      li.addEventListener("click", () => selectPatient(p.id));
+      patientListEl.appendChild(li);
+    });
+  }
+  function selectPatient(id){ activeId = id; activeStep = STEPS[0].id; renderPatientList(); renderMain(); }
+
+  function stepDone(record, stepId){
+    const r = record || {};
+    if(stepId === "objetivos") return !!(r.objetivos && (r.objetivos.peso || r.objetivos.altura));
+    if(stepId === "bia") return !!(r.bia && (r.bia.mm_atual || r.bia.peso_atual));
+    if(stepId === "perfil") return !!(r.perfil && r.perfil.queixas && Object.values(r.perfil.queixas).some(Boolean));
+    if(stepId === "conduta") return !!(r.esportiva || r.perimenopausa || r.suplementacao || r.fadiga);
+    if(stepId === "plano") return !!(r.calculadora && r.calculadora.peso);
+    if(stepId === "orientacoes") return !!(r.orientacoes && r.orientacoes.texto);
+    return false;
+  }
+
+  function renderMain(){
+    if(!activeId){
+      mainContentEl.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--ink-faint); font-size:13px; padding:60px;">Selecione uma paciente na lista, ou crie uma nova ficha para começar.</div>`;
+      return;
+    }
+    const patient = patients.find(p => p.id === activeId);
+    if(!patient){ activeId = null; return renderMain(); }
+    const record = records[activeId] || (records[activeId] = {});
+    mainContentEl.innerHTML = `
+      <div class="patient-header">
+        <div>
+          <h1>${escapeHtml(patient.name)}</h1>
+          <div class="meta">${patient.birth ? "Nascimento: " + escapeHtml(patient.birth) : "Sem data de nascimento cadastrada"}</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn ghost small" id="printBtn">Imprimir</button>
+          <button class="btn danger small" id="deleteBtn">Remover</button>
+        </div>
+      </div>
+      <nav class="step-nav" id="stepNavEl"></nav>
+      <div class="step-panel" id="stepPanelEl"></div>
+      <div class="disclaimer-bar">Ferramenta de apoio pessoal — não substitui o prontuário oficial. Não inclua nome completo, CPF ou nº de prontuário.</div>
+    `;
+    const stepNavEl = document.getElementById("stepNavEl");
+    STEPS.forEach(s => {
+      const el = document.createElement("div");
+      el.className = "step-pill" + (s.id === activeStep ? " active" : "") + (stepDone(record, s.id) ? " done" : "");
+      el.innerHTML = `<span class="n">${stepDone(record, s.id) && s.id !== activeStep ? "✓" : s.num}</span>${s.label}`;
+      el.addEventListener("click", () => { activeStep = s.id; renderMain(); });
+      stepNavEl.appendChild(el);
+    });
+    document.getElementById("printBtn").addEventListener("click", () => window.print());
+    document.getElementById("deleteBtn").addEventListener("click", () => {
+      if(!confirm("Remover esta paciente desta tela? (a planilha definitiva não é afetada)")) return;
+      patients = patients.filter(p => p.id !== activeId);
+      delete records[activeId];
+      activeId = null;
+      renderPatientList(); renderMain();
+    });
+    const panelEl = document.getElementById("stepPanelEl");
+    if(activeStep === "objetivos") renderObjetivosStep(panelEl, record);
+    else if(activeStep === "bia") renderBiaStep(panelEl, record);
+    else if(activeStep === "perfil") renderPerfilStep(panelEl, record);
+    else if(activeStep === "conduta") renderCondutaStep(panelEl, record);
+    else if(activeStep === "plano") renderPlanoStep(panelEl, record);
+    else if(activeStep === "orientacoes") renderOrientacoesStep(panelEl, record);
+  }
+
+  // ---------------------------------------------------------------------
+  // ETAPA 1 — Dados objetivos
+  // ---------------------------------------------------------------------
+  function renderObjetivosStep(panelEl, record){
+    const d = record.objetivos || {};
+    let rows = d.labs ? JSON.parse(JSON.stringify(d.labs)) : JSON.parse(JSON.stringify(LAB_DEFAULTS));
+    function labFlag(row){
+      const v = num(row.valor), min = num(row.min), max = num(row.max);
+      if(v === null || min === null || max === null) return "";
+      if(v < min) return `<span class="flag low">baixo</span>`;
+      if(v > max) return `<span class="flag high">alto</span>`;
+      return `<span class="flag ok">na faixa</span>`;
+    }
+    function labRow(row, idx){
+      return `<tr data-idx="${idx}">
+        <td><input type="text" class="lab-nome" value="${escapeHtml(row.nome||"")}" /></td>
+        <td><input type="text" class="lab-valor" value="${escapeHtml(row.valor||"")}" style="width:65px;" /></td>
+        <td><input type="text" class="lab-unidade" value="${escapeHtml(row.unidade||"")}" style="width:65px;" /></td>
+        <td><input type="text" class="lab-min" value="${escapeHtml(row.min||"")}" style="width:50px;" /></td>
+        <td><input type="text" class="lab-max" value="${escapeHtml(row.max||"")}" style="width:50px;" /></td>
+        <td class="lab-flag-cell">${labFlag(row)}</td>
+        <td><button class="btn ghost small lab-remove" type="button">×</button></td>
+      </tr>`;
+    }
+    function fullHtml(){
+      return `
+        <div class="step-title">Dados objetivos</div>
+        <div class="step-sub">Antropometria, pressão arterial e exames-chave. Preencha ao vivo durante a consulta — esses valores são reaproveitados automaticamente no plano alimentar e na composição corporal.</div>
+        <div class="card">
+          <div class="card-head">Antropometria</div>
+          <div class="field-grid">
+            <div class="field"><label>Peso (kg)</label><input type="text" id="ob_peso" value="${escapeHtml(d.peso||"")}" /></div>
+            <div class="field"><label>Altura (cm)</label><input type="text" id="ob_altura" value="${escapeHtml(d.altura||"")}" /></div>
+            <div class="field"><label>Idade (anos)</label><input type="text" id="ob_idade" value="${escapeHtml(d.idade||"")}" /></div>
+            <div class="field"><label>Sexo biológico</label>
+              <select id="ob_sexo">
+                <option value="">Selecione...</option>
+                <option value="F" ${d.sexo==="F"?"selected":""}>Feminino</option>
+                <option value="M" ${d.sexo==="M"?"selected":""}>Masculino</option>
+              </select>
+            </div>
+            <div class="field"><label>PA sistólica (mmHg)</label><input type="text" id="ob_pa_sist" value="${escapeHtml(d.pa_sist||"")}" /></div>
+            <div class="field"><label>PA diastólica (mmHg)</label><input type="text" id="ob_pa_diast" value="${escapeHtml(d.pa_diast||"")}" /></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">Exames laboratoriais</div>
+          <div style="overflow-x:auto;">
+          <table class="lab-table">
+            <thead><tr><th>Exame</th><th>Valor</th><th>Unid.</th><th>Mín.</th><th>Máx.</th><th>Status</th><th></th></tr></thead>
+            <tbody id="labBody">${rows.map(labRow).join("")}</tbody>
+          </table>
+          </div>
+          <button class="btn ghost small" id="addLabRow" type="button" style="margin-top:10px;">+ Adicionar exame</button>
+        </div>
+        <div class="save-row">
+          <button class="btn primary" id="saveStepBtn">Salvar etapa (baixa arquivo)</button>
+          <span class="save-status" id="saveStatus"></span>
+        </div>`;
+    }
+    function readData(){
+      return {
+        peso: document.getElementById("ob_peso").value,
+        altura: document.getElementById("ob_altura").value,
+        idade: document.getElementById("ob_idade").value,
+        sexo: document.getElementById("ob_sexo").value,
+        pa_sist: document.getElementById("ob_pa_sist").value,
+        pa_diast: document.getElementById("ob_pa_diast").value,
+        labs: rows,
+      };
+    }
+    function sync(){ record.objetivos = readData(); }
+    function bind(){
+      ["ob_peso","ob_altura","ob_idade","ob_sexo","ob_pa_sist","ob_pa_diast"].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener("input", sync);
+        el.addEventListener("change", sync);
+      });
+      document.getElementById("labBody").querySelectorAll("tr").forEach(tr => {
+        const idx = parseInt(tr.getAttribute("data-idx"));
+        ["nome","valor","unidade","min","max"].forEach(k => {
+          tr.querySelector(`.lab-${k}`).addEventListener("input", (e) => {
+            rows[idx][k] = e.target.value;
+            if(k === "valor" || k === "min" || k === "max"){
+              tr.querySelector(".lab-flag-cell").innerHTML = labFlag(rows[idx]);
+            }
+            sync();
+          });
+        });
+        tr.querySelector(".lab-remove").addEventListener("click", () => { rows.splice(idx,1); sync(); rerender(); });
+      });
+      document.getElementById("addLabRow").addEventListener("click", () => {
+        rows.push({ nome:"", unidade:"", min:"", max:"", valor:"" }); sync(); rerender();
+      });
+      sync();
+      document.getElementById("saveStepBtn").addEventListener("click", () => {
+        sync();
+        downloadJSON(`${activeId}_dados_objetivos.json`, { paciente: activeId, etapa: "objetivos", dados: record.objetivos });
+        const st = document.getElementById("saveStatus");
+        st.textContent = "Salvo ✓ — me envie o arquivo aqui no chat.";
+      });
+    }
+    function rerender(){ panelEl.innerHTML = fullHtml(); bind(); }
+    rerender();
+  }
+
+  // ---------------------------------------------------------------------
+  // ETAPA 2 — Composição corporal (BIA) com diagnóstico automático
+  // ---------------------------------------------------------------------
+  function renderBiaStep(panelEl, record){
+    const d = record.bia || {};
+    const ob = record.objetivos || {};
+    const chk = (key) => d[key] ? "checked" : "";
+    panelEl.innerHTML = `
+      <div class="step-title">Composição corporal (BIA)</div>
+      <div class="step-sub">Baseado em Nutroweek 23, Aula 4 (Dr. Guilherme Giorelli, HIA Einstein). Preencha o resultado da bioimpedância — a ferramenta gera automaticamente um diagnóstico da composição corporal, usado depois na etapa de Conduta.</div>
+
+      <div class="card">
+        <div class="card-head">Confiabilidade do exame</div>
+        <div class="field-grid">
+          <div class="field"><label>Tipo de aparelho</label>
+            <select id="bia_aparelho">${["Não informado","Octopolar multifrequencial (recomendado)","Tetrapolar/bipolar simples","Outro/não sei"].map(v=>opt(v, d.aparelho||"Não informado")).join("")}</select>
+          </div>
+        </div>
+        <div class="field-grid" style="margin-top:10px;">
+          <label class="checkbox-inline"><input type="checkbox" id="bia_prep_exercicio" ${chk("prep_exercicio")}> Absteve-se de exercício intenso nas 24h anteriores</label>
+          <label class="checkbox-inline"><input type="checkbox" id="bia_prep_hidratacao" ${chk("prep_hidratacao")}> Sem álcool/diuréticos nas 12h anteriores</label>
+          <label class="checkbox-inline"><input type="checkbox" id="bia_prep_jejum" ${chk("prep_jejum")}> Jejum de 2–4h (ou sem refeição pesada)</label>
+          <label class="checkbox-inline"><input type="checkbox" id="bia_prep_metal" ${chk("prep_metal")}> Vestuário leve, sem objetos metálicos</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">Comparação de composição corporal</div>
+        <div class="field-grid">
+          <div class="field"><label>Peso atual (kg)</label><input type="text" id="bia_peso_atual" value="${escapeHtml(d.peso_atual || ob.peso || "")}" /></div>
+          <div class="field"><label>Peso avaliação anterior (kg)</label><input type="text" id="bia_peso_anterior" value="${escapeHtml(d.peso_anterior||"")}" /></div>
+          <div class="field"><label>Massa muscular atual (kg)</label><input type="text" id="bia_mm_atual" value="${escapeHtml(d.mm_atual||"")}" /></div>
+          <div class="field"><label>Massa muscular anterior (kg)</label><input type="text" id="bia_mm_anterior" value="${escapeHtml(d.mm_anterior||"")}" /></div>
+          <div class="field"><label>Massa gorda atual (kg)</label><input type="text" id="bia_gord_atual" value="${escapeHtml(d.gord_atual||"")}" /></div>
+          <div class="field"><label>Massa gorda anterior (kg)</label><input type="text" id="bia_gord_anterior" value="${escapeHtml(d.gord_anterior||"")}" /></div>
+          <div class="field"><label>Gordura visceral (cm²)</label><input type="text" id="bia_visceral" value="${escapeHtml(d.visceral||"")}" /></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">Qualidade muscular / sarcopenia</div>
+        <div class="step-sub" style="margin-bottom:8px;">Sexo biológico usado: ${ob.sexo === "M" ? "Masculino" : ob.sexo === "F" ? "Feminino" : "não informado na Etapa 1 — preencha lá"}.</div>
+        <div class="field-grid">
+          <div class="field"><label>Dinamômetro / handgrip (kg)</label><input type="text" id="bia_handgrip" value="${escapeHtml(d.handgrip||"")}" /></div>
+          <div class="field"><label>Teste da cadeira (repetições em 15s)</label><input type="text" id="bia_cadeira" value="${escapeHtml(d.cadeira||"")}" /></div>
+        </div>
+      </div>
+
+      <div class="step-title" style="font-size:14.5px; margin-top:6px;">Diagnóstico da composição corporal</div>
+      <div id="biaDiagBox"></div>
+
+      <div class="save-row">
+        <button class="btn primary" id="saveStepBtn">Salvar etapa (baixa arquivo)</button>
+        <span class="save-status" id="saveStatus"></span>
+      </div>
+      <div class="source-note">Fonte: Nutroweek 23 — Nutrologia do Exercício, Aula 4 (Dr. Guilherme Giorelli, HIA Einstein), Nutrology Academy. A BIA não substitui a calorimetria indireta/DEXA quando indicados; interpretar sempre com julgamento clínico.</div>
+    `;
+    const ids = ["bia_aparelho","bia_prep_exercicio","bia_prep_hidratacao","bia_prep_jejum","bia_prep_metal",
+      "bia_peso_atual","bia_peso_anterior","bia_mm_atual","bia_mm_anterior","bia_gord_atual","bia_gord_anterior",
+      "bia_visceral","bia_handgrip","bia_cadeira"];
+    function isChecked(id){ const el = document.getElementById(id); return el ? el.checked : false; }
+    function val(id){ const el = document.getElementById(id); return el ? el.value : ""; }
+    function readData(){
+      return {
+        aparelho: val("bia_aparelho"),
+        prep_exercicio: isChecked("bia_prep_exercicio"), prep_hidratacao: isChecked("bia_prep_hidratacao"),
+        prep_jejum: isChecked("bia_prep_jejum"), prep_metal: isChecked("bia_prep_metal"),
+        peso_atual: val("bia_peso_atual"), peso_anterior: val("bia_peso_anterior"),
+        mm_atual: val("bia_mm_atual"), mm_anterior: val("bia_mm_anterior"),
+        gord_atual: val("bia_gord_atual"), gord_anterior: val("bia_gord_anterior"),
+        visceral: val("bia_visceral"), handgrip: val("bia_handgrip"), cadeira: val("bia_cadeira"),
+      };
+    }
+    function refresh(){
+      const x = readData();
+      const diag = computeBiaDiagnostico(x, record);
+      const box = document.getElementById("biaDiagBox");
+      box.innerHTML = `<div class="diag-box">
+        <div class="diag-headline"><span class="diag-badge ${diag.badgeClass}">${diag.badgeLabel}</span> ${diag.headline}</div>
+        ${diag.linhas.map(l => `<div class="diag-line">${l}</div>`).join("")}
+      </div>`;
+    }
+    function sync(){ record.bia = readData(); }
+    ids.forEach(id => { const el = document.getElementById(id); el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
+    sync();
+    refresh();
+    document.getElementById("saveStepBtn").addEventListener("click", () => {
+      sync();
+      downloadJSON(`${activeId}_bia.json`, { paciente: activeId, etapa: "bia", dados: record.bia });
+      document.getElementById("saveStatus").textContent = "Salvo ✓ — me envie o arquivo aqui no chat.";
+    });
+  }
+
+  function computeBiaDiagnostico(x, record){
+    const ob = (record && record.objetivos) || {};
+    const perfil = (record && record.perfil) || {};
+    const glp1 = perfil.medicamentos && perfil.medicamentos.glp1 && perfil.medicamentos.glp1 !== "Não usa" ? perfil.medicamentos.glp1 : null;
+    const hasInput = x.aparelho !== "Não informado" || x.prep_exercicio || x.prep_hidratacao || x.prep_jejum || x.prep_metal ||
+      x.peso_atual || x.peso_anterior || x.mm_atual || x.mm_anterior || x.gord_atual || x.gord_anterior || x.visceral ||
+      x.handgrip || x.cadeira;
+    if(!hasInput){
+      return { badgeClass:"warn", badgeLabel:"sem dados", headline:"Preencha as medidas acima", linhas:["Assim que houver ao menos um valor preenchido, o diagnóstico aparece aqui automaticamente."] };
+    }
+    const linhas = [];
+    let pior = "ok"; // ok < warn < bad
+
+    if(x.aparelho !== "Octopolar multifrequencial (recomendado)"){
+      linhas.push("Aparelho não confirmado como octopolar multifrequencial: ABESO (2016) e ABRAN/Sociedade Brasileira de Medicina do Esporte recomendam BIA octopolar (8 eletrodos) e multifrequencial para reprodutibilidade e acurácia clínica.");
+      pior = "warn";
+    }
+    const prepFaltando = [];
+    if(!x.prep_exercicio) prepFaltando.push("abstinência de exercício 24h");
+    if(!x.prep_hidratacao) prepFaltando.push("sem álcool/diuréticos 12h");
+    if(!x.prep_jejum) prepFaltando.push("jejum 2–4h");
+    if(!x.prep_metal) prepFaltando.push("sem metais");
+    if(prepFaltando.length){
+      linhas.push(`Preparo incompleto (faltando: ${prepFaltando.join(", ")}): resultado pode estar enviesado — ex.: exercício intenso recente subestima a massa muscular.`);
+      pior = "warn";
+    }
+
+    const pesoA = num(x.peso_atual), pesoP = num(x.peso_anterior), mmA = num(x.mm_atual), mmP = num(x.mm_anterior),
+          gordA = num(x.gord_atual), gordP = num(x.gord_anterior);
+    if(pesoA !== null && pesoP !== null && mmA !== null && mmP !== null){
+      const dPeso = pesoA - pesoP, dMM = mmA - mmP, dGord = (gordA !== null && gordP !== null) ? gordA - gordP : null;
+      if(dPeso > 0 && dMM > 0 && (dGord === null || dGord <= 0)){
+        linhas.push(`Ganho de peso "paradoxal": peso +${dPeso.toFixed(1)} kg, mas massa muscular +${dMM.toFixed(1)} kg${dGord !== null ? ` e gordura ${dGord.toFixed(1)} kg` : ""} — composição melhorou. Mensagem à paciente: "seu peso aumentou, mas a composição mudou a seu favor".`);
+      } else {
+        linhas.push(`Variação desde a avaliação anterior: peso ${dPeso>=0?"+":""}${dPeso.toFixed(1)} kg, massa muscular ${dMM>=0?"+":""}${dMM.toFixed(1)} kg${dGord !== null ? `, gordura ${dGord>=0?"+":""}${dGord.toFixed(1)} kg` : ""}.`);
+      }
+    }
+
+    let sarcopenia = false;
+    const handgrip = num(x.handgrip), cadeira = num(x.cadeira), sexo = ob.sexo;
+    if(handgrip !== null && sexo){
+      const corte = sexo === "M" ? 27 : 16;
+      if(handgrip < corte){ sarcopenia = true; linhas.push(`Handgrip ${handgrip} kg abaixo do ponto de corte (${sexo==="M"?"<27 kg homens":"<16 kg mulheres"}) — risco de sarcopenia.`); }
+    }
+    if(cadeira !== null && cadeira <= 5){ sarcopenia = true; linhas.push("Teste da cadeira com ≤5 repetições em 15s — risco de sarcopenia."); }
+    if(sarcopenia){ pior = "bad"; linhas.push("Reforçar treino de força progressivo e proteína 1,6–2,2 g/kg/dia."); }
+
+    if(glp1){
+      linhas.push(`Em uso de ${glp1}: risco de perda de massa muscular se proteína/estímulo de força não forem mantidos — monitorar BIA mensalmente, considerar elevar proteína até 2,2 g/kg/dia.`);
+      if(pior === "ok") pior = "warn";
+    }
+
+    const visceral = num(x.visceral);
+    if(visceral !== null){
+      if(visceral < 100){
+        linhas.push(`Gordura visceral ${visceral} cm² (<100): risco cardiometabólico reduzido.`);
+      } else {
+        linhas.push(`Gordura visceral ${visceral} cm² (≥100): risco aumentado — reforçar déficit calórico moderado (-10% a -20%) e treino de força + cardio leve.`);
+        pior = "bad";
+      }
+    }
+
+    let headline, badgeLabel;
+    if(pior === "bad"){ headline = "Achados relevantes na composição corporal"; badgeLabel = "atenção"; }
+    else if(pior === "warn"){ headline = "Composição corporal com pontos de atenção"; badgeLabel = "revisar"; }
+    else { headline = "Composição corporal dentro do esperado"; badgeLabel = "ok"; }
+    if(!linhas.length) linhas.push("Nenhum achado de risco identificado com os dados preenchidos até agora.");
+    return { badgeClass: pior, badgeLabel, headline, linhas };
+  }
+
+  // ---------------------------------------------------------------------
+  // Roteiros completos ("aprofundar") — reaproveitam os motores de decisão
+  // ---------------------------------------------------------------------
+  function renderSuplementacaoAprofundar(container, record, defaultObjetivo){
+    const d = record.suplementacao || {};
+    const chk = (key) => d[key] ? "checked" : "";
+    container.innerHTML = `
+      <div class="field-grid">
+        <div class="field"><label>Objetivo do paciente</label>
+          <select id="sp_objetivo">${["Performance/competição","Emagrecimento","Hipertrofia","Saúde geral","Recuperação de lesão"].map(v=>opt(v, d.objetivo||defaultObjetivo||"Saúde geral")).join("")}</select>
+        </div>
+        <div class="field"><label>Perfil</label>
+          <select id="sp_perfil">${["Atleta profissional","Profissional ocupado / pouco tempo","Vegetariano/vegano","Sedentário iniciando atividade"].map(v=>opt(v, d.perfil||"Sedentário iniciando atividade")).join("")}</select>
+        </div>
+        <div class="field"><label>Tipo de esforço predominante</label>
+          <select id="sp_esforco">${["Endurance (>60 min contínuo)","Alta intensidade (<1h)","Força/potência"].map(v=>opt(v, d.esforco||"Alta intensidade (<1h)")).join("")}</select>
+        </div>
+        <div class="field" style="grid-column:1 / -1;"><label>Restrições alimentares / alergias</label><input type="text" id="sp_restricoes" value="${escapeHtml(d.restricoes||"")}" /></div>
+        <label class="checkbox-inline"><input type="checkbox" id="sp_renal" ${chk("renal")}> Insuficiência renal</label>
+        <label class="checkbox-inline"><input type="checkbox" id="sp_has" ${chk("has")}> Hipertensão</label>
+        <label class="checkbox-inline"><input type="checkbox" id="sp_dm" ${chk("dm")}> Diabetes</label>
+        <label class="checkbox-inline"><input type="checkbox" id="sp_prova_longa" ${chk("prova_longa")}> Prova de longa duração ("treinar o intestino")</label>
+      </div>
+      <div class="subhead">Suplementos já em uso</div>
+      <div class="field-grid">
+        ${["cafeina","creatina","betaalanina","bicarbonato","nitrato","whey","caseina","omega3","vitd","calcio","ferro"].map(k => {
+          const labels = { cafeina:"Cafeína", creatina:"Creatina", betaalanina:"Beta-alanina", bicarbonato:"Bicarbonato de sódio", nitrato:"Nitrato/beterraba", whey:"Whey protein", caseina:"Caseína", omega3:"Ômega-3", vitd:"Vitamina D", calcio:"Cálcio", ferro:"Ferro" };
+          return `<label class="checkbox-inline"><input type="checkbox" id="sp_uso_${k}" ${chk("uso_"+k)}> ${labels[k]}</label>`;
+        }).join("")}
+      </div>
+      <div class="subhead">Sugestão detalhada</div>
+      <div id="spResultBox"></div>
+      <div class="save-row">
+        <button class="btn primary small" id="spSaveBtn" type="button">Salvar roteiro (baixa arquivo)</button>
+        <span class="save-status" id="spSaveStatus"></span>
+      </div>
+      <div class="source-note">Fonte: Nutroweek 23, Aula 5 (Dr. Guilherme Giorelli, HIA Einstein).</div>
+    `;
+    const ids = ["sp_objetivo","sp_perfil","sp_esforco","sp_restricoes","sp_renal","sp_has","sp_dm","sp_prova_longa",
+      "sp_uso_cafeina","sp_uso_creatina","sp_uso_betaalanina","sp_uso_bicarbonato","sp_uso_nitrato","sp_uso_whey",
+      "sp_uso_caseina","sp_uso_omega3","sp_uso_vitd","sp_uso_calcio","sp_uso_ferro"];
+    function isChecked(id){ const el = document.getElementById(id); return el ? el.checked : false; }
+    function val(id){ const el = document.getElementById(id); return el ? el.value : ""; }
+    function readData(){
+      return {
+        objetivo: val("sp_objetivo"), perfil: val("sp_perfil"), esforco: val("sp_esforco"), restricoes: val("sp_restricoes"),
+        renal: isChecked("sp_renal"), has: isChecked("sp_has"), dm: isChecked("sp_dm"), prova_longa: isChecked("sp_prova_longa"),
+        uso_cafeina: isChecked("sp_uso_cafeina"), uso_creatina: isChecked("sp_uso_creatina"), uso_betaalanina: isChecked("sp_uso_betaalanina"),
+        uso_bicarbonato: isChecked("sp_uso_bicarbonato"), uso_nitrato: isChecked("sp_uso_nitrato"), uso_whey: isChecked("sp_uso_whey"),
+        uso_caseina: isChecked("sp_uso_caseina"), uso_omega3: isChecked("sp_uso_omega3"), uso_vitd: isChecked("sp_uso_vitd"),
+        uso_calcio: isChecked("sp_uso_calcio"), uso_ferro: isChecked("sp_uso_ferro"),
+      };
+    }
+    function computeSuggestions(x){
+      const s = [];
+      const choMap = {
+        "Endurance (>60 min contínuo)": "8–12 g/kg/dia de carboidrato — necessário para repor glicogênio e sustentar sessões longas.",
+        "Alta intensidade (<1h)": "3–5 g/kg/dia de carboidrato — suficiente para manter glicemia e evitar fadiga em esforços curtos e intensos.",
+        "Força/potência": "3–5 g/kg/dia de carboidrato — a proteína é priorizada, mas o carboidrato ainda é necessário para a recuperação.",
+      };
+      s.push(choMap[x.esforco] || choMap["Alta intensidade (<1h)"]);
+      if(x.perfil === "Atleta profissional" || x.objetivo === "Performance/competição"){
+        s.push("Proteína total 1,2–2,0 g/kg/dia. Timing sugerido: café da manhã 0,3 g/kg (whey ou proteína vegetal de rápida absorção) · almoço 0,3 g/kg (fonte completa) · lanche da tarde 0,2 g/kg (whey ou caseína) · jantar 0,3 g/kg (fonte completa + caseína) · pós-treino 0,2–0,3 g/kg de whey isolado, ~30 min após o treino.");
+      } else {
+        s.push("Proteína total 1,2–2,0 g/kg/dia, distribuída ao longo do dia a cada 3–4h.");
+      }
+      const ergo = [];
+      if(x.esforco === "Força/potência" || x.objetivo === "Hipertrofia" || x.perfil === "Vegetariano/vegano"){
+        ergo.push("Creatina 3–5 g/dia contínuo (carga opcional 20 g/dia por 5–7 dias) — repõe fosfocreatina, aumenta força explosiva.");
+      }
+      if(x.esforco === "Alta intensidade (<1h)"){
+        ergo.push("Beta-alanina 2–6 g/dia dividida (carga 4–6 g/dia por 4–6 semanas) — eleva carnosina intramuscular.");
+        ergo.push("Bicarbonato de sódio 300 mg/kg 2–3h antes — reduz acidez extracelular em esforços intensos de curta duração.");
+      }
+      if(x.esforco === "Endurance (>60 min contínuo)"){
+        ergo.push("Nitrato/beterraba ≥300 mg (≈150 g de beterraba) 2–3h antes — melhora a eficiência muscular.");
+      }
+      if(x.objetivo === "Performance/competição" || x.objetivo === "Emagrecimento"){
+        ergo.push("Cafeína 3–6 mg/kg/dia, 60 min antes — reduz a percepção de esforço.");
+      }
+      if(ergo.length){ s.push(`Ergogênicos indicados (evidência nível A, IOC/ACSM): ${ergo.join(" ")}`); }
+      else { s.push("Nenhum dos 5 ergogênicos de evidência nível A se destaca especificamente para este objetivo/esforço."); }
+      if(x.perfil === "Vegetariano/vegano"){ s.push("Perfil vegetariano/vegano: reforçar creatina 3–5 g/dia e beta-alanina >2 g/dia (carnosina endógena mais baixa)."); }
+      if(x.renal){ s.push("Insuficiência renal: creatina e bicarbonato exigem cautela — avaliar função renal antes."); }
+      if(x.has){ s.push("Hipertensão: cautela com cafeína em doses altas e sódio do bicarbonato."); }
+      if(x.dm){ s.push("Diabetes: atenção ao carboidrato dos suplementos (maltodextrina/palatinose), doses fracionadas."); }
+      if(!x.uso_vitd || !x.uso_calcio || !x.uso_ferro || !x.uso_omega3){
+        s.push("Suplementos médicos ainda não em uso (indicar conforme exame/deficiência): cálcio, ferro, vitamina D, ômega-3 1–2 g/dia EPA+DHA.");
+      }
+      if(x.prova_longa){
+        s.push('"Training the gut": semana 1–2: 30 g/h · semana 3–4: 45 g/h · semana 5–6: 60 g/h (maltodextrina+frutose) · semana 7+: 90–100 g/h.');
+      }
+      s.push("Reavaliar a cada 4–6 semanas (3 E's — Escutar, Executar, Estudar).");
+      return s;
+    }
+    function refresh(){
+      const s = computeSuggestions(readData());
+      document.getElementById("spResultBox").innerHTML = `<div class="diag-box">${s.map(t=>`<div class="diag-line">${t}</div>`).join("")}</div>`;
+    }
+    function sync(){ record.suplementacao = readData(); }
+    ids.forEach(id => { const el = document.getElementById(id); el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
+    sync(); refresh();
+    document.getElementById("spSaveBtn").addEventListener("click", () => {
+      sync();
+      downloadJSON(`${activeId}_suplementacao.json`, { paciente: activeId, etapa: "suplementacao", dados: record.suplementacao });
+      document.getElementById("spSaveStatus").textContent = "Salvo ✓";
+    });
+  }
+
+  function renderEsportivaAprofundar(container, record){
+    const d = record.esportiva || {};
+    const chk = (key) => d[key] ? "checked" : "";
+    container.innerHTML = `
+      <div class="field-grid">
+        <div class="field"><label>Modalidade principal</label><input type="text" id="es_modalidade" value="${escapeHtml(d.modalidade||"")}" /></div>
+        <div class="field"><label>Padrão</label><select id="es_continuidade">${["Contínuo","Intervalado"].map(v=>opt(v, d.continuidade||"Contínuo")).join("")}</select></div>
+        <div class="field"><label>Intensidade predominante</label><select id="es_intensidade">${["Submáxima","Máxima","Supramáxima"].map(v=>opt(v, d.intensidade||"Submáxima")).join("")}</select></div>
+        <div class="field"><label>Duração típica do esforço/série</label><select id="es_duracao">${["<10 segundos","10–120 segundos","2–5 minutos","5–60 minutos",">60 minutos"].map(v=>opt(v, d.duracao||"5–60 minutos")).join("")}</select></div>
+        <div class="field"><label>Duração total da sessão</label><select id="es_sessao">${["<60 min","60–120 min",">120 min"].map(v=>opt(v, d.sessao||"<60 min")).join("")}</select></div>
+        <div class="field"><label>Volume semanal</label><input type="text" id="es_volume" value="${escapeHtml(d.volume||"")}" /></div>
+        <label class="checkbox-inline"><input type="checkbox" id="es_vegetariano" ${chk("vegetariano")}> Dieta vegetariana/vegana</label>
+        <label class="checkbox-inline"><input type="checkbox" id="es_renal" ${chk("renal")}> Restrição/disfunção renal</label>
+      </div>
+      <div class="subhead">Sugestão detalhada</div>
+      <div id="esResultBox"></div>
+      <div class="save-row">
+        <button class="btn primary small" id="esSaveBtn" type="button">Salvar roteiro (baixa arquivo)</button>
+        <span class="save-status" id="esSaveStatus"></span>
+      </div>
+      <div class="source-note">Fonte: Nutroweek 23, Aula 2 (Dr. Milton Mizumoto, HIA Einstein).</div>
+    `;
+    const ids = ["es_modalidade","es_continuidade","es_intensidade","es_duracao","es_sessao","es_volume","es_vegetariano","es_renal"];
+    function isChecked(id){ return document.getElementById(id).checked; }
+    function val(id){ return document.getElementById(id).value; }
+    function readData(){
+      return { modalidade: val("es_modalidade"), continuidade: val("es_continuidade"), intensidade: val("es_intensidade"),
+        duracao: val("es_duracao"), sessao: val("es_sessao"), volume: val("es_volume"),
+        vegetariano: isChecked("es_vegetariano"), renal: isChecked("es_renal") };
+    }
+    function computeSuggestions(x){
+      const s = [];
+      const sistemaMap = {
+        "<10 segundos": "Sistema ATP-fosfocreatina predominante. Suplemento-chave: creatina 3–5 g/dia.",
+        "10–120 segundos": "Sistema glicolítico anaeróbio/lático — considerar beta-alanina se esforços >60s repetidos.",
+        "2–5 minutos": "Zona de transição glicolítica/aeróbia.",
+        "5–60 minutos": "Oxidação aeróbia predominante — se >60min, planejar carboidrato intra-treino.",
+        ">60 minutos": "Oxidação aeróbia de longa duração — CHO intra-treino, cafeína 3–6 mg/kg.",
+      };
+      s.push(sistemaMap[x.duracao] || sistemaMap["5–60 minutos"]);
+      s.push("Pré-treino (30–60 min antes): carboidrato de alto índice glicêmico — ex.: 1 banana + 30g maltodextrina.");
+      if(x.sessao === "60–120 min"){ s.push("Sessão 60–120 min: maltodextrina isolada ou com frutose no intra-treino."); }
+      else if(x.sessao === ">120 min"){ s.push("Sessão >2h: hidrogel (maltodextrina+frutose+alginato) para menor osmolaridade."); }
+      if(x.sessao !== "<60 min"){ s.push("Cafeína 3–6 mg/kg pode reduzir percepção de esforço em treinos >60 min."); }
+      s.push("Pós-treino: janela de 10–15 min de maior sensibilidade; combine CHO+PTN (30–40g CHO + 20–25g PTN).");
+      s.push("Proteína total 1,6–2,2 g/kg/dia; 0,3–0,4 g/kg a cada 3–4h nas 24h pós-treino.");
+      if(x.vegetariano){ s.push("Vegetariano/vegano: reforçar creatina 3–5 g/dia."); }
+      if(x.renal){ s.push("Disfunção renal: creatina restrita — avaliar função renal antes."); }
+      return s;
+    }
+    function refresh(){
+      const s = computeSuggestions(readData());
+      document.getElementById("esResultBox").innerHTML = `<div class="diag-box">${s.map(t=>`<div class="diag-line">${t}</div>`).join("")}</div>`;
+    }
+    function sync(){ record.esportiva = readData(); }
+    ids.forEach(id => { const el = document.getElementById(id); el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
+    sync(); refresh();
+    document.getElementById("esSaveBtn").addEventListener("click", () => {
+      sync();
+      downloadJSON(`${activeId}_esportiva.json`, { paciente: activeId, etapa: "esportiva", dados: record.esportiva });
+      document.getElementById("esSaveStatus").textContent = "Salvo ✓";
+    });
+  }
+
+  function renderPerimenopausaAprofundar(container, record){
+    const d = record.perimenopausa || {};
+    const chk = (key) => d[key] ? "checked" : "";
+    container.innerHTML = `
+      <div class="field-grid">
+        <div class="field"><label>Fase hormonal</label><select id="pm_fase">${["Não avaliado","Perimenopausa inicial","Perimenopausa avançada / pós-menopausa"].map(v=>opt(v, d.fase||"Não avaliado")).join("")}</select></div>
+        <div class="field"><label>Duração total da sessão</label><select id="pm_sessao">${["<60 min","60–120 min",">120 min"].map(v=>opt(v, d.sessao||"<60 min")).join("")}</select></div>
+        <div class="field"><label>Horário habitual de treino</label><select id="pm_horario">${["Manhã (06h–08h)","Tarde (14h–16h)","Noite (20h–22h)","Variável/não fixo"].map(v=>opt(v, d.horario||"Variável/não fixo")).join("")}</select></div>
+        <div class="field"><label>Relação Testosterona/Cortisol (T/C)</label><select id="pm_tc">${["Não avaliada","Alta (>1) — ambiente anabólico","Baixa (<0,5) — catabolismo/overtraining"].map(v=>opt(v, d.tc||"Não avaliada")).join("")}</select></div>
+        <label class="checkbox-inline"><input type="checkbox" id="pm_plato" ${chk("plato")}> Platô de força há mais de 4–5 semanas</label>
+        <label class="checkbox-inline"><input type="checkbox" id="pm_renal" ${chk("renal")}> Disfunção renal conhecida</label>
+      </div>
+      <div class="subhead">Sugestão detalhada</div>
+      <div id="pmResultBox"></div>
+      <div class="save-row">
+        <button class="btn primary small" id="pmSaveBtn" type="button">Salvar roteiro (baixa arquivo)</button>
+        <span class="save-status" id="pmSaveStatus"></span>
+      </div>
+      <div class="source-note">Fonte: Nutroweek 23, Aula 3 (Dr. Milton Mizumoto, HIA Einstein).</div>
+    `;
+    const ids = ["pm_fase","pm_sessao","pm_horario","pm_tc","pm_plato","pm_renal"];
+    function isChecked(id){ return document.getElementById(id).checked; }
+    function val(id){ return document.getElementById(id).value; }
+    function readData(){
+      return { fase: val("pm_fase"), sessao: val("pm_sessao"), horario: val("pm_horario"), tc: val("pm_tc"),
+        plato: isChecked("pm_plato"), renal: isChecked("pm_renal") };
+    }
+    function computeSuggestions(x){
+      const s = [];
+      const treina = (record.perfil && record.perfil.habitos && record.perfil.habitos.treino !== "Não pratica");
+      const vegetariano = (record.perfil && record.perfil.habitos && record.perfil.habitos.padrao_alimentar === "Vegetariano/vegano");
+      if(x.plato){ s.push("Platô identificado: variar carga, volume ou frequência (treinos a cada 48h, alternando grupos)."); }
+      if(treina){
+        s.push("Priorizar treino de força ≥85% 1RM. Estratégia 'força + excêntrico' + isométricos para estabilidade postural.");
+        if(x.horario !== "Tarde (14h–16h)"){ s.push("Considerar deslocar treino para 14h–20h (janela de cortisol mais baixo)."); }
+        if(x.sessao !== "<60 min"){ s.push("Sessão ≥60min: reduzir carga para 70–75% 1RM e ingerir 30–50g CHO antes do treino."); }
+      } else {
+        s.push("Ainda não treina: orientar início gradual de treino de força (2–3x/semana).");
+      }
+      if(treina || vegetariano){
+        s.push("Creatina 3–5 g/dia." + (vegetariano ? " Reforçar: creatina endógena mais baixa em dieta vegetariana/vegana." : ""));
+        if(x.renal){ s.push("Disfunção renal: avaliar função renal antes de suplementar creatina."); }
+      }
+      s.push("Proteína 1,6–2,2 g/kg/dia; vitamina D 2.000–4.000 UI/dia; magnésio 300–400 mg/dia; ômega-3 1–2 g/dia.");
+      if(x.tc === "Baixa (<0,5) — catabolismo/overtraining"){ s.push("T/C baixa: reduzir volume de treino, priorizar sono e CHO pré-treino."); }
+      return s;
+    }
+    function refresh(){
+      const s = computeSuggestions(readData());
+      document.getElementById("pmResultBox").innerHTML = `<div class="diag-box">${s.map(t=>`<div class="diag-line">${t}</div>`).join("")}</div>`;
+    }
+    function sync(){ record.perimenopausa = readData(); }
+    ids.forEach(id => { const el = document.getElementById(id); el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
+    sync(); refresh();
+    document.getElementById("pmSaveBtn").addEventListener("click", () => {
+      sync();
+      downloadJSON(`${activeId}_perimenopausa.json`, { paciente: activeId, etapa: "perimenopausa", dados: record.perimenopausa });
+      document.getElementById("pmSaveStatus").textContent = "Salvo ✓";
+    });
+  }
+
+  function renderFadigaAprofundar(container, record){
+    const d = record.fadiga || {};
+    const labs = (record.objetivos && record.objetivos.labs) || [];
+    const alterados = labs.filter(r => { const v=num(r.valor), mi=num(r.min), ma=num(r.max); return v!==null && mi!==null && ma!==null && (v<mi || v>ma); });
+    container.innerHTML = `
+      <div class="field-grid">
+        <div class="field"><label>Duração do cansaço</label><input type="text" id="fd_duracao" value="${escapeHtml(d.duracao||"")}" placeholder="dias, semanas, meses..." /></div>
+        <div class="field"><label>Quando começou o ganho/perda de peso</label><input type="text" id="fd_peso_inicio" value="${escapeHtml(d.peso_inicio||"")}" /></div>
+        <div class="field"><label>Janela de ingestão de CHO em relação ao treino</label>
+          <select id="fd_janela_cho">${["Não avaliado","Alinhada","Desalinhada/não investigada"].map(v=>opt(v, d.janela_cho||"Não avaliado")).join("")}</select>
+        </div>
+        <label class="checkbox-inline"><input type="checkbox" id="fd_hipo" ${d.hipo?"checked":""}> Histórico de hipo/hiperglicemia pós-refeição</label>
+      </div>
+      <div class="subhead">Exames da Etapa 1 fora da faixa</div>
+      <div class="diag-box">${alterados.length ? alterados.map(r=>`<div class="diag-line">${escapeHtml(r.nome)}: ${escapeHtml(r.valor)} ${escapeHtml(r.unidade)} (referência ${escapeHtml(r.min)}–${escapeHtml(r.max)})</div>`).join("") : '<div class="diag-line">Nenhum exame fora da faixa registrado na Etapa 1 (ou exames ainda não preenchidos).</div>'}</div>
+      <div class="subhead">Sugestão</div>
+      <div id="fdResultBox"></div>
+      <div class="save-row">
+        <button class="btn primary small" id="fdSaveBtn" type="button">Salvar roteiro (baixa arquivo)</button>
+        <span class="save-status" id="fdSaveStatus"></span>
+      </div>
+      <div class="source-note">Fonte: Nutroweek 23, Aula 6 (Dr. Milton Mizumoto, HIA Einstein) — modelo de triagem "cansado que não melhora com descanso".</div>
+    `;
+    function readData(){
+      return { duracao: document.getElementById("fd_duracao").value, peso_inicio: document.getElementById("fd_peso_inicio").value,
+        janela_cho: document.getElementById("fd_janela_cho").value, hipo: document.getElementById("fd_hipo").checked };
+    }
+    function refresh(){
+      const x = readData();
+      const s = [];
+      if(x.janela_cho === "Desalinhada/não investigada"){ s.push("Investigar a janela de CHO em relação ao treino — erro recorrente que pode mascarar hipo/hiperglicemia."); }
+      if(x.hipo){ s.push("Histórico de hipo/hiperglicemia pós-prandial: HbA1c normal não exclui essas variações agudas — considerar investigação adicional."); }
+      if(alterados.length){ s.push("Correlacionar os exames alterados acima com a queixa antes de fechar a conduta."); }
+      if(!s.length){ s.push("Preencha os campos acima pra ver a triagem específica desta paciente."); }
+      document.getElementById("fdResultBox").innerHTML = `<div class="diag-box">${s.map(t=>`<div class="diag-line">${t}</div>`).join("")}</div>`;
+    }
+    function sync(){ record.fadiga = readData(); }
+    container.querySelectorAll("input, select").forEach(el => { el.addEventListener("input", () => { sync(); refresh(); }); el.addEventListener("change", () => { sync(); refresh(); }); });
+    sync(); refresh();
+    document.getElementById("fdSaveBtn").addEventListener("click", () => {
+      sync();
+      downloadJSON(`${activeId}_fadiga.json`, { paciente: activeId, etapa: "fadiga", dados: record.fadiga });
+      document.getElementById("fdSaveStatus").textContent = "Salvo ✓";
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // ETAPA 3 — Queixas, hábitos e medicações em uso
+  // ---------------------------------------------------------------------
+  const QUEIXAS_DEF = [
+    { key: "emagrecimento", label: "Emagrecimento / platô" },
+    { key: "fadiga", label: "Fadiga / energia baixa" },
+    { key: "performance", label: "Performance / suplementação esportiva" },
+    { key: "perimenopausa", label: "Perimenopausa / climatério" },
+  ];
+  function renderPerfilStep(panelEl, record){
+    const d = record.perfil || {};
+    const q = d.queixas || {};
+    const h = d.habitos || {};
+    const m = d.medicamentos || {};
+    const chk = (v) => v ? "checked" : "";
+    panelEl.innerHTML = `
+      <div class="step-title">Queixas, hábitos & medicações</div>
+      <div class="step-sub">O que a paciente trouxe hoje, um raio-x rápido dos hábitos e o que ela já usa. Isso alimenta as sugestões da próxima etapa (Conduta & suplementação).</div>
+
+      <div class="card">
+        <div class="card-head">Queixas principais</div>
+        <div class="field-grid">
+          ${QUEIXAS_DEF.map(qd => `<label class="checkbox-inline" style="padding:4px 0;"><input type="checkbox" id="pf_q_${qd.key}" ${chk(q[qd.key])}> ${qd.label}</label>`).join("")}
+        </div>
+        <div class="field" style="margin-top:12px;"><label>Outras queixas (livre)</label><input type="text" id="pf_livre" value="${escapeHtml(d.queixa_livre||"")}" placeholder="Ex.: queda de cabelo, inchaço, constipação..." /></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">Hábitos</div>
+        <div class="field-grid">
+          <div class="field"><label>Padrão de treino atual</label>
+            <select id="pf_treino">${["Não pratica","Aeróbico apenas","Resistência (força) apenas","Combinado"].map(v=>opt(v, h.treino||"Não pratica")).join("")}</select>
+          </div>
+          <div class="field"><label>Tipo de esforço predominante (se treina)</label>
+            <select id="pf_esforco">${["Não se aplica","Endurance (>60 min contínuo)","Alta intensidade (<1h)","Força/potência"].map(v=>opt(v, h.esforco_tipo||"Não se aplica")).join("")}</select>
+          </div>
+          <div class="field"><label>Sono (horas/noite)</label>
+            <select id="pf_sono">${["Não avaliado","<6h","6–7h","7–9h",">9h"].map(v=>opt(v, h.sono||"Não avaliado")).join("")}</select>
+          </div>
+          <div class="field"><label>Padrão alimentar</label>
+            <select id="pf_padrao">${["Não avaliado","Ocidental/ultraprocessado","Mediterrâneo","Vegetariano/vegano","Low carb"].map(v=>opt(v, h.padrao_alimentar||"Não avaliado")).join("")}</select>
+          </div>
+          <label class="checkbox-inline"><input type="checkbox" id="pf_plato" ${chk(h.plato)}> Platô de peso/treino relatado (estagnação há &gt;4–5 semanas)</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">Medicações em uso</div>
+        <div class="field-grid">
+          <div class="field"><label>Análogo de GLP-1</label>
+            <select id="pf_glp1">${["Não usa","Semaglutida","Tirzepatida","Liraglutida","Outro análogo GLP-1"].map(v=>opt(v, m.glp1||"Não usa")).join("")}</select>
+          </div>
+          <div class="field"><label>Outras medicações/suplementos relevantes</label><input type="text" id="pf_outros" value="${escapeHtml(m.outros||"")}" /></div>
+        </div>
+      </div>
+
+      <div class="save-row">
+        <button class="btn primary" id="saveStepBtn">Salvar etapa (baixa arquivo)</button>
+        <span class="save-status" id="saveStatus"></span>
+      </div>`;
+    function readData(){
+      return {
+        queixas: {
+          emagrecimento: document.getElementById("pf_q_emagrecimento").checked,
+          fadiga: document.getElementById("pf_q_fadiga").checked,
+          performance: document.getElementById("pf_q_performance").checked,
+          perimenopausa: document.getElementById("pf_q_perimenopausa").checked,
+        },
+        queixa_livre: document.getElementById("pf_livre").value,
+        habitos: {
+          treino: document.getElementById("pf_treino").value,
+          esforco_tipo: document.getElementById("pf_esforco").value,
+          sono: document.getElementById("pf_sono").value,
+          padrao_alimentar: document.getElementById("pf_padrao").value,
+          plato: document.getElementById("pf_plato").checked,
+        },
+        medicamentos: {
+          glp1: document.getElementById("pf_glp1").value,
+          outros: document.getElementById("pf_outros").value,
+        },
+      };
+    }
+    function sync(){ record.perfil = readData(); }
+    panelEl.querySelectorAll("input, select").forEach(el => {
+      el.addEventListener("input", sync);
+      el.addEventListener("change", sync);
+    });
+    sync();
+    document.getElementById("saveStepBtn").addEventListener("click", () => {
+      sync();
+      downloadJSON(`${activeId}_perfil.json`, { paciente: activeId, etapa: "perfil", dados: record.perfil });
+      document.getElementById("saveStatus").textContent = "Salvo ✓ — me envie o arquivo aqui no chat.";
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // ETAPA 4 — Conduta & suplementação (rápida por queixa + aprofundar)
+  // ---------------------------------------------------------------------
+  function computeQuickEmagrecimento(record){
+    const s = [];
+    const perfil = record.perfil || {};
+    const h = perfil.habitos || {};
+    const m = perfil.medicamentos || {};
+    const bia = record.bia || {};
+    const diag = computeBiaDiagnostico(bia, record);
+    if(m.glp1 && m.glp1 !== "Não usa"){
+      s.push(`Em uso de ${m.glp1}: priorizar proteína 1,2–2,2 g/kg/dia e treino de força para preservar massa magra durante a perda de peso.`);
+    }
+    const sarcopenia = diag.linhas.some(l => l.includes("sarcopenia"));
+    const visceralAlto = diag.linhas.some(l => l.includes("risco aumentado"));
+    if(sarcopenia){ s.push("Sinal de sarcopenia identificado na composição corporal — a meta de emagrecimento deve vir com treino de força e proteína ≥1,6 g/kg, não só déficit calórico."); }
+    if(visceralAlto){ s.push("Gordura visceral elevada — déficit calórico moderado (-10% a -20% da TMB) é preferível a um déficit agressivo."); }
+    if(h.plato){ s.push("Platô relatado: variar carga, volume ou frequência do treino antes de aprofundar ainda mais o déficit calórico."); }
+    if(!s.length){ s.push("Déficit calórico moderado (ver Plano Alimentar) associado a treino de resistência preserva massa magra melhor que dieta isolada."); }
+    return s;
+  }
+  function computeQuickFadiga(record){
+    const s = [];
+    const perfil = record.perfil || {};
+    const h = perfil.habitos || {};
+    const m = perfil.medicamentos || {};
+    const labs = (record.objetivos && record.objetivos.labs) || [];
+    const alterados = labs.filter(r => { const v=num(r.valor), mi=num(r.min), ma=num(r.max); return v!==null && mi!==null && ma!==null && (v<mi || v>ma); });
+    if(alterados.length){
+      s.push(`Exames fora da faixa na Etapa 1: ${alterados.map(r => r.nome).join(", ")} — investigar como possível causa da fadiga.`);
+    }
+    if(h.sono === "<6h"){ s.push("Sono <6h/noite relatado: priorizar 7–9h antes de investigar outras causas — sono insuficiente já explica boa parte de fadiga/baixa energia."); }
+    if(m.glp1 && m.glp1 !== "Não usa"){ s.push(`Em uso de ${m.glp1}: fadiga pode ser efeito colateral — considerar fracionar refeições e checar eletrólitos.`); }
+    s.push("Lembrar (Aula 6): HbA1c normal não exclui variações glicêmicas agudas — se a queixa persistir sem causa clara, aprofundar com a triagem completa abaixo.");
+    return s;
+  }
+  function computeQuickPerformance(record){
+    const s = [];
+    const h = (record.perfil && record.perfil.habitos) || {};
+    const ergoMap = {
+      "Endurance (>60 min contínuo)": "Priorizar carboidrato (8–12 g/kg/dia) e considerar nitrato/beterraba ≥300 mg 2–3h antes — foco em economia de esforço prolongado.",
+      "Alta intensidade (<1h)": "Beta-alanina e bicarbonato de sódio são os ergogênicos com melhor racional para esforços intensos repetidos <1h.",
+      "Força/potência": "Creatina 3–5 g/dia contínuo é o ergogênico com melhor racional para força/potência.",
+    };
+    s.push(ergoMap[h.esforco_tipo] || "Defina o tipo de esforço predominante nos hábitos (Etapa 3) para uma sugestão de suplementação mais específica.");
+    s.push("Proteína total 1,2–2,0 g/kg/dia, distribuída a cada 3–4h, é a base independente da modalidade.");
+    return s;
+  }
+  function computeQuickPerimenopausa(record){
+    const s = [];
+    const idade = num(record.objetivos && record.objetivos.idade);
+    const h = (record.perfil && record.perfil.habitos) || {};
+    if(idade !== null){
+      if(idade < 50) s.push(`${idade} anos: fase típica de início da perimenopausa — queda gradual de estrogênio/progesterona, testosterona ovariana também começa a cair.`);
+      else if(idade < 60) s.push(`${idade} anos: fase de redução mais acentuada de estrogênio — treino e nutrição precisam compensar ativamente a perda hormonal.`);
+      else s.push(`${idade} anos: predomínio da produção adrenal de andrógenos — reforçar treino de força e proteína.`);
+    }
+    if(h.treino === "Não pratica"){ s.push("Ainda não treina: iniciar treino de força progressivo é a intervenção mais eficaz nessa fase."); }
+    else { s.push("Priorizar treino de força ≥85% 1RM e horário entre 14h–20h (janela de cortisol mais baixo)."); }
+    return s;
+  }
+
+  function renderCondutaStep(panelEl, record){
+    const perfil = record.perfil || {};
+    const q = perfil.queixas || {};
+    const ativos = QUEIXAS_DEF.filter(qd => q[qd.key]);
+    let html = `
+      <div class="step-title">Conduta & suplementação</div>
+      <div class="step-sub">Sugestão rápida pra cada queixa marcada, cruzando composição corporal, hábitos e medicações. Clique em "Ver roteiro completo" pra aprofundar naquele tema.</div>`;
+    if(!ativos.length){
+      html += `<div class="empty-hint">Nenhuma queixa marcada ainda — volte à Etapa 3 (Queixas & hábitos) e marque ao menos uma pra ver as sugestões aqui.</div>`;
+      if((perfil.queixa_livre||"").trim()){
+        html += `<div class="card"><div class="card-head">Queixa livre registrada</div><div style="font-size:12.5px;">${escapeHtml(perfil.queixa_livre)}</div></div>`;
+      }
+      panelEl.innerHTML = html;
+      return;
+    }
+    const quickFns = { emagrecimento: computeQuickEmagrecimento, fadiga: computeQuickFadiga, performance: computeQuickPerformance, perimenopausa: computeQuickPerimenopausa };
+    ativos.forEach(qd => {
+      const bullets = quickFns[qd.key](record);
+      html += `
+        <div class="queixa-card">
+          <div class="queixa-head"><span class="qtitle">${qd.label}</span></div>
+          <div class="queixa-body">
+            <div class="queixa-quick">${bullets.map(b => `<div class="qline">${b}</div>`).join("")}</div>
+            <span class="aprofundar-toggle" data-target="aprof_${qd.key}">Ver roteiro completo ↓</span>
+            <div class="aprofundar-panel" id="aprof_${qd.key}"></div>
+          </div>
+        </div>`;
+    });
+    if((perfil.queixa_livre||"").trim()){
+      html += `<div class="card"><div class="card-head">Queixa livre registrada</div><div style="font-size:12.5px;">${escapeHtml(perfil.queixa_livre)}</div></div>`;
+    }
+    panelEl.innerHTML = html;
+    panelEl.querySelectorAll(".aprofundar-toggle").forEach(t => {
+      t.addEventListener("click", () => {
+        const target = document.getElementById(t.getAttribute("data-target"));
+        const isOpen = target.classList.contains("open");
+        if(isOpen){ target.classList.remove("open"); t.textContent = "Ver roteiro completo ↓"; return; }
+        target.classList.add("open");
+        t.textContent = "Ocultar roteiro completo ↑";
+        if(!target.dataset.rendered){
+          const key = t.getAttribute("data-target").replace("aprof_", "");
+          if(key === "emagrecimento") renderSuplementacaoAprofundar(target, record, "Emagrecimento");
+          if(key === "performance") renderEsportivaAprofundar(target, record);
+          if(key === "perimenopausa") renderPerimenopausaAprofundar(target, record);
+          if(key === "fadiga") renderFadigaAprofundar(target, record);
+          target.dataset.rendered = "1";
+        }
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // ETAPA 5 — Plano alimentar
+  // ---------------------------------------------------------------------
+  function downloadText(filename, text){
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function computeCalculadora(d){
+    const peso = num(d.peso), altura = num(d.altura), idade = num(d.idade);
+    const sexo = d.sexo, formula = d.formula || "mifflin", fatorAt = num(d.fator) || 1.375,
+          ajusteKcal = num(d.ajuste) || 0, protGkg = num(d.prot_gkg), gordPct = (num(d.gord_pct) || 25) / 100;
+    if(!peso || !altura || !idade || !sexo) return null;
+    let tmb;
+    if(formula === "harris"){
+      tmb = sexo === "M" ? 13.397*peso + 4.799*altura - 5.677*idade + 88.362 : 9.247*peso + 3.098*altura - 4.330*idade + 447.593;
+    } else {
+      tmb = sexo === "M" ? 10*peso + 6.25*altura - 5*idade + 5 : 10*peso + 6.25*altura - 5*idade - 161;
+    }
+    const get = tmb * fatorAt;
+    const meta = get + ajusteKcal;
+    const proteinaG = protGkg ? protGkg * peso : null;
+    const proteinaKcal = proteinaG ? proteinaG * 4 : null;
+    const gorduraKcal = meta * gordPct;
+    const gorduraG = gorduraKcal / 9;
+    const carboKcal = proteinaKcal ? meta - proteinaKcal - gorduraKcal : null;
+    const carboG = carboKcal !== null ? carboKcal / 4 : null;
+    return { tmb, get, meta, proteinaG, proteinaKcal, gorduraKcal, gorduraG, carboKcal, carboG };
+  }
+  const MEAL_PRESETS = {
+    "3": [ {nome:"Café da manhã", pct:0.30, lanche:true}, {nome:"Almoço", pct:0.40, lanche:false}, {nome:"Jantar", pct:0.30, lanche:false} ],
+    "4": [ {nome:"Café da manhã", pct:0.25, lanche:true}, {nome:"Almoço", pct:0.35, lanche:false}, {nome:"Lanche da tarde", pct:0.15, lanche:true}, {nome:"Jantar", pct:0.25, lanche:false} ],
+    "5": [ {nome:"Café da manhã", pct:0.20, lanche:true}, {nome:"Lanche da manhã", pct:0.10, lanche:true}, {nome:"Almoço", pct:0.30, lanche:false}, {nome:"Lanche da tarde", pct:0.15, lanche:true}, {nome:"Jantar", pct:0.25, lanche:false} ],
+    "6": [ {nome:"Café da manhã", pct:0.20, lanche:true}, {nome:"Lanche da manhã", pct:0.10, lanche:true}, {nome:"Almoço", pct:0.30, lanche:false}, {nome:"Lanche da tarde", pct:0.10, lanche:true}, {nome:"Jantar", pct:0.25, lanche:false}, {nome:"Ceia", pct:0.05, lanche:true} ],
+  };
+  const FOOD_GROUPS = [
+    { key:"carbo", nome:"Carboidrato", macro:"≈15g CHO", itens:["1 fatia de pão integral (25g)","4 col. sopa de arroz cozido (90g)","1/2 batata média cozida (100g)","3 col. sopa de aveia (20g)","1/2 pão francês (25g)","3 col. sopa de feijão cozido (90g)"] },
+    { key:"fruta", nome:"Fruta", macro:"≈15g CHO", itens:["1 banana média (50g)","1 maçã média (100g)","1 fatia de mamão (150g)","1 xícara de morangos (200g)","1 laranja média (130g)","10 uvas (80g)"] },
+    { key:"proteina", nome:"Proteína magra", macro:"≈7g PTN + 3g GORD", itens:["1 ovo (50g)","30g de frango grelhado","30g de peixe grelhado","30g de queijo minas frescal","2 fatias de peito de peru (30g)","60g de tofu grelhado"] },
+    { key:"gordura", nome:"Gordura", macro:"≈5g GORD", itens:["1 col. chá de azeite (5ml)","3 castanhas-do-pará","1/2 unidade pequena de abacate (30g)","1 col. sopa rasa de pasta de amendoim","6 amêndoas"] },
+    { key:"hortalica", nome:"Hortaliça", macro:"à vontade", itens:["Alface, rúcula, agrião","Tomate, pepino, rabanete","Abobrinha, brócolis, couve-flor"] },
+  ];
+  function pick(list, idx){ return list[idx % list.length]; }
+  function renderPlanoStep(panelEl, record){
+    const ob = record.objetivos || {};
+    const d = record.calculadora || {};
+    panelEl.innerHTML = `
+      <div class="step-title">Plano alimentar</div>
+      <div class="step-sub">Peso/altura/idade/sexo pré-preenchidos da Etapa 1. Documento separado das orientações — exporte em texto pronto pra enviar.</div>
+      <div class="card">
+        <div class="field-grid">
+          <div class="field"><label>Peso (kg)</label><input type="text" id="c_peso" value="${escapeHtml(d.peso||ob.peso||"")}" /></div>
+          <div class="field"><label>Altura (cm)</label><input type="text" id="c_altura" value="${escapeHtml(d.altura||ob.altura||"")}" /></div>
+          <div class="field"><label>Idade (anos)</label><input type="text" id="c_idade" value="${escapeHtml(d.idade||ob.idade||"")}" /></div>
+          <div class="field"><label>Sexo biológico</label>
+            <select id="c_sexo"><option value="">Selecione...</option><option value="F" ${(d.sexo||ob.sexo)==="F"?"selected":""}>Feminino</option><option value="M" ${(d.sexo||ob.sexo)==="M"?"selected":""}>Masculino</option></select>
+          </div>
+          <div class="field"><label>Fórmula de TMB</label><select id="c_formula"><option value="mifflin" ${d.formula!=="harris"?"selected":""}>Mifflin-St Jeor</option><option value="harris" ${d.formula==="harris"?"selected":""}>Harris-Benedict</option></select></div>
+          <div class="field"><label>Fator de atividade</label>
+            <select id="c_fator">
+              <option value="1.2" ${d.fator==="1.2"?"selected":""}>Sedentário (1.2)</option>
+              <option value="1.375" ${(d.fator==="1.375"||!d.fator)?"selected":""}>Leve (1.375)</option>
+              <option value="1.55" ${d.fator==="1.55"?"selected":""}>Moderado (1.55)</option>
+              <option value="1.725" ${d.fator==="1.725"?"selected":""}>Intenso (1.725)</option>
+              <option value="1.9" ${d.fator==="1.9"?"selected":""}>Muito intenso (1.9)</option>
+            </select>
+          </div>
+          <div class="field"><label>Objetivo</label>
+            <select id="c_objetivo">
+              <option value="Emagrecimento" data-ajuste="-500" ${d.objetivo==="Emagrecimento"||!d.objetivo?"selected":""}>Emagrecimento (déficit -500)</option>
+              <option value="Manutenção" data-ajuste="0" ${d.objetivo==="Manutenção"?"selected":""}>Manutenção (0)</option>
+              <option value="Ganho de massa" data-ajuste="300" ${d.objetivo==="Ganho de massa"?"selected":""}>Ganho de massa (+300)</option>
+              <option value="Recomposição" data-ajuste="-250" ${d.objetivo==="Recomposição"?"selected":""}>Recomposição (-250)</option>
+            </select>
+          </div>
+          <div class="field"><label>Ajuste calórico (kcal)</label><input type="text" id="c_ajuste" value="${escapeHtml(d.ajuste||"-500")}" /></div>
+          <div class="field"><label>Proteína (g/kg/dia)</label><input type="text" id="c_prot" value="${escapeHtml(d.prot_gkg||"1.8")}" /></div>
+          <div class="field"><label>Gordura (% da meta)</label><input type="text" id="c_gord" value="${escapeHtml(d.gord_pct||"25")}" /></div>
+          <div class="field"><label>Número de refeições/dia</label>
+            <select id="c_nrefeicoes"><option value="3" ${d.n_refeicoes==="3"?"selected":""}>3</option><option value="4" ${d.n_refeicoes==="4"?"selected":""}>4</option><option value="5" ${d.n_refeicoes==="5"?"selected":""}>5</option><option value="6" ${(d.n_refeicoes==="6"||!d.n_refeicoes)?"selected":""}>6</option></select>
+          </div>
+        </div>
+      </div>
+      <div id="calcResultBox"></div>
+      <div class="subhead">Tabela de substituição</div>
+      <div id="substTableBox"></div>
+      <div class="subhead">Sugestão de cardápio por refeição</div>
+      <div class="step-sub" id="mealPlanIntro"></div>
+      <div id="mealPlanBox"></div>
+      <div class="save-row">
+        <button class="btn primary" id="saveStepBtn" type="button">Salvar dados (baixa JSON)</button>
+        <button class="btn ghost" id="exportTxtBtn" type="button">Exportar plano em texto (pra paciente)</button>
+        <span class="save-status" id="saveStatus"></span>
+      </div>
+    `;
+    const ids = ["c_objetivo","c_peso","c_altura","c_idade","c_sexo","c_formula","c_fator","c_ajuste","c_prot","c_gord","c_nrefeicoes"];
+    function v(id){ return document.getElementById(id).value; }
+    function readData(){
+      return { objetivo: v("c_objetivo"), peso: v("c_peso"), altura: v("c_altura"), idade: v("c_idade"), sexo: v("c_sexo"),
+        formula: v("c_formula"), fator: v("c_fator"), ajuste: v("c_ajuste"), prot_gkg: v("c_prot"), gord_pct: v("c_gord"), n_refeicoes: v("c_nrefeicoes") };
+    }
+    document.getElementById("c_objetivo").addEventListener("change", () => {
+      const sel = document.getElementById("c_objetivo");
+      document.getElementById("c_ajuste").value = sel.options[sel.selectedIndex].getAttribute("data-ajuste");
+      refresh();
+    });
+    let mealOverrides = Object.assign({}, d.mealOverrides || {});
+    function renderSubstitutionTable(){
+      document.getElementById("substTableBox").innerHTML = FOOD_GROUPS.map(g => `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:12px; font-weight:700; color:var(--accent-dark); margin-bottom:3px;">${g.nome} <span style="font-weight:400; color:var(--ink-faint);">(1 porção ${g.macro})</span></div>
+          <div style="font-size:12px; color:var(--ink-soft); line-height:1.7;">${g.itens.join(" · ")}</div>
+        </div>`).join("");
+    }
+    function renderMealPlan(r, nRefeicoes){
+      const box = document.getElementById("mealPlanBox");
+      const MEALS = MEAL_PRESETS[nRefeicoes] || MEAL_PRESETS["6"];
+      document.getElementById("mealPlanIntro").textContent = MEALS.map(m => `${m.nome} ${Math.round(m.pct*100)}%`).join(" · ");
+      renderSubstitutionTable();
+      if(!r.proteinaG){ box.innerHTML = `<div class="empty-hint">Preencha a meta de proteína (g/kg) para gerar a sugestão por refeição.</div>`; return; }
+      let html = `<div style="overflow-x:auto;"><table class="lab-table"><thead><tr><th>Refeição</th><th>Kcal</th><th>Proteína</th><th>Sugestão (editável)</th></tr></thead><tbody>`;
+      MEALS.forEach((m, idx) => {
+        const kcal = r.meta * m.pct, ptn = r.proteinaG * m.pct, cho = r.carboG !== null ? r.carboG * m.pct : 0, gord = r.gorduraG * m.pct;
+        const nProt = Math.round(ptn/7), fatFromProt = nProt*3, nGord = Math.max(0, Math.round((gord-fatFromProt)/5));
+        const nCarbTotal = Math.round(cho/15), nFruta = m.lanche && nCarbTotal>=1 ? 1 : 0, nCarb = Math.max(0, nCarbTotal-nFruta);
+        const autoSugestao = [nCarb>0?pick(FOOD_GROUPS[0].itens, idx):"", nFruta>0?pick(FOOD_GROUPS[1].itens, idx+1):"", ptn>0?pick(FOOD_GROUPS[2].itens, idx):"", nGord>0?pick(FOOD_GROUPS[3].itens, idx):"", !m.lanche?"salada/legumes à vontade":""].filter(Boolean).join(" + ");
+        const displayValue = mealOverrides[m.nome] !== undefined ? mealOverrides[m.nome] : autoSugestao;
+        const ptnLow = ptn < 20 && ptn > 0;
+        html += `<tr><td><strong>${m.nome}</strong></td><td>${kcal.toFixed(0)} kcal</td><td>${ptn>0?ptn.toFixed(0)+"g"+(ptnLow?' <span style="color:var(--warn);">⚠</span>':""):"—"}</td>
+          <td><input type="text" class="meal-edit-input" data-meal="${escapeHtml(m.nome)}" value="${escapeHtml(displayValue)}" style="width:100%; font-family:inherit; font-size:12px; padding:5px 7px; border:1px solid var(--border); border-radius:6px;"></td></tr>`;
+      });
+      html += `</tbody></table></div>`;
+      box.innerHTML = html;
+      box.querySelectorAll(".meal-edit-input").forEach(inp => inp.addEventListener("input", () => { mealOverrides[inp.getAttribute("data-meal")] = inp.value; sync(); }));
+    }
+    function sync(){ const data = readData(); const r = computeCalculadora(data); record.calculadora = Object.assign({}, data, { resultado: r, mealOverrides: Object.assign({}, mealOverrides) }); }
+    function refresh(){
+      const data = readData();
+      const r = computeCalculadora(data);
+      const box = document.getElementById("calcResultBox");
+      if(!r){ box.innerHTML = `<div class="empty-hint">Preencha peso, altura, idade e sexo (ou volte à Etapa 1).</div>`; document.getElementById("mealPlanBox").innerHTML=""; document.getElementById("mealPlanIntro").innerHTML=""; document.getElementById("substTableBox").innerHTML=""; sync(); return; }
+      box.innerHTML = `<div class="diag-box">
+        <div class="diag-line"><strong>TMB</strong>: ${r.tmb.toFixed(0)} kcal/dia</div>
+        <div class="diag-line"><strong>GET</strong>: ${r.get.toFixed(0)} kcal/dia</div>
+        <div class="diag-line" style="color:var(--accent-dark); font-weight:700;">Meta calórica: ${r.meta.toFixed(0)} kcal/dia</div>
+        ${r.proteinaG?`<div class="diag-line">Proteína: ${r.proteinaG.toFixed(0)} g</div>`:""}
+        <div class="diag-line">Gordura: ${r.gorduraG.toFixed(0)} g</div>
+        ${r.carboG!==null?`<div class="diag-line">Carboidrato: ${r.carboG.toFixed(0)} g</div>`:""}
+      </div>`;
+      renderMealPlan(r, data.n_refeicoes || "6");
+      sync();
+    }
+    ids.forEach(id => { document.getElementById(id).addEventListener("input", refresh); document.getElementById(id).addEventListener("change", refresh); });
+    refresh();
+    document.getElementById("saveStepBtn").addEventListener("click", () => {
+      sync();
+      downloadJSON(`${activeId}_plano_alimentar.json`, { paciente: activeId, etapa: "calculadora", dados: record.calculadora });
+      document.getElementById("saveStatus").textContent = "Salvo ✓ — me envie o arquivo aqui no chat.";
+    });
+    document.getElementById("exportTxtBtn").addEventListener("click", () => {
+      sync();
+      const r = record.calculadora.resultado;
+      if(!r){ alert("Preencha os dados do plano antes de exportar."); return; }
+      const MEALS = MEAL_PRESETS[record.calculadora.n_refeicoes || "6"] || MEAL_PRESETS["6"];
+      let txt = `PLANO ALIMENTAR\n\nMeta calórica: ${r.meta.toFixed(0)} kcal/dia\n`;
+      if(r.proteinaG) txt += `Proteína: ${r.proteinaG.toFixed(0)} g/dia\n`;
+      txt += `Gordura: ${r.gorduraG.toFixed(0)} g/dia\n`;
+      if(r.carboG !== null) txt += `Carboidrato: ${r.carboG.toFixed(0)} g/dia\n`;
+      txt += `\nREFEIÇÕES\n`;
+      MEALS.forEach(m => {
+        const kcal = r.meta * m.pct;
+        const sug = mealOverrides[m.nome] || "";
+        txt += `\n${m.nome} (${kcal.toFixed(0)} kcal): ${sug}`;
+      });
+      txt += `\n\nTABELA DE SUBSTITUIÇÃO\n`;
+      FOOD_GROUPS.forEach(g => { txt += `\n${g.nome} (1 porção ${g.macro}): ${g.itens.join(", ")}`; });
+      txt += `\n\n— Plano gerado como apoio educacional, ajustar sempre com orientação médica/nutricional.`;
+      downloadText(`${activeId}_plano_alimentar.txt`, txt);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // ETAPA 6 — Orientações pra casa
+  // ---------------------------------------------------------------------
+  function gerarOrientacoesDraft(record){
+    const perfil = record.perfil || {};
+    const q = perfil.queixas || {};
+    const ativos = QUEIXAS_DEF.filter(qd => q[qd.key]);
+    const quickFns = { emagrecimento: computeQuickEmagrecimento, fadiga: computeQuickFadiga, performance: computeQuickPerformance, perimenopausa: computeQuickPerimenopausa };
+    let txt = `Olá! Aqui está um resumo do que conversamos na consulta de hoje e os próximos passos até o retorno.\n`;
+    if(!ativos.length){
+      txt += `\n(Nenhuma queixa foi marcada na Etapa 3 ainda — volte lá e marque, ou escreva livremente aqui.)\n`;
+    }
+    ativos.forEach(qd => {
+      txt += `\n${qd.label.toUpperCase()}\n`;
+      quickFns[qd.key](record).forEach(b => { txt += `- ${b.replace(/<[^>]+>/g, "")}\n`; });
+    });
+    if((perfil.queixa_livre||"").trim()){
+      txt += `\nOUTRAS QUEIXAS RELATADAS\n- ${perfil.queixa_livre}\n`;
+    }
+    const calc = record.calculadora;
+    if(calc && calc.resultado){
+      const r = calc.resultado;
+      txt += `\nPLANO ALIMENTAR (resumo — o cardápio completo está em documento separado)\nMeta calórica: ${r.meta.toFixed(0)} kcal/dia`;
+      if(r.proteinaG) txt += ` · Proteína: ${r.proteinaG.toFixed(0)} g/dia`;
+      txt += `\n`;
+    }
+    const supUso = [];
+    if(record.suplementacao) supUso.push("suplementação (ver roteiro detalhado)");
+    if(record.esportiva) supUso.push("nutrição esportiva (ver roteiro detalhado)");
+    if(record.perimenopausa) supUso.push("perimenopausa (ver roteiro detalhado)");
+    if(supUso.length){ txt += `\nTambém revisamos: ${supUso.join(", ")}.\n`; }
+    txt += `\nQualquer dúvida até o retorno, me chame. Um abraço!`;
+    return txt;
+  }
+  function renderOrientacoesStep(panelEl, record){
+    const d = record.orientacoes || {};
+    const texto = d.texto !== undefined && d.texto !== "" ? d.texto : gerarOrientacoesDraft(record);
+    panelEl.innerHTML = `
+      <div class="step-title">Orientações pra casa</div>
+      <div class="step-sub">Rascunho gerado a partir das queixas e do que foi marcado nas etapas anteriores, em linguagem simples. Edite à vontade antes de exportar — documento separado do plano alimentar.</div>
+      <div class="card">
+        <textarea id="or_texto" style="width:100%; min-height:320px; font-family:inherit; font-size:13px; line-height:1.6; border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px;">${escapeHtml(texto)}</textarea>
+      </div>
+      <div class="save-row">
+        <button class="btn ghost" id="regenBtn" type="button">↻ Gerar rascunho automático de novo</button>
+        <button class="btn primary" id="saveStepBtn" type="button">Salvar (baixa JSON)</button>
+        <button class="btn ghost" id="exportTxtBtn" type="button">Exportar orientações (texto pra paciente)</button>
+        <span class="save-status" id="saveStatus"></span>
+      </div>
+    `;
+    function sync(){ record.orientacoes = { texto: document.getElementById("or_texto").value }; }
+    document.getElementById("or_texto").addEventListener("input", sync);
+    sync();
+    document.getElementById("regenBtn").addEventListener("click", () => {
+      if(!confirm("Isso substitui o texto atual pelo rascunho automático. Continuar?")) return;
+      document.getElementById("or_texto").value = gerarOrientacoesDraft(record);
+      sync();
+    });
+    document.getElementById("saveStepBtn").addEventListener("click", () => {
+      sync();
+      downloadJSON(`${activeId}_orientacoes.json`, { paciente: activeId, etapa: "orientacoes", dados: record.orientacoes });
+      document.getElementById("saveStatus").textContent = "Salvo ✓ — me envie o arquivo aqui no chat.";
+    });
+    document.getElementById("exportTxtBtn").addEventListener("click", () => {
+      sync();
+      downloadText(`${activeId}_orientacoes.txt`, record.orientacoes.texto);
+    });
+  }
+
+  document.getElementById("addPatientBtn").addEventListener("click", () => {
+    document.getElementById("newName").value = "";
+    document.getElementById("newBirth").value = "";
+    modalOverlay.classList.add("show");
+    document.getElementById("newName").focus();
+  });
+  document.getElementById("cancelAdd").addEventListener("click", () => modalOverlay.classList.remove("show"));
+  modalOverlay.addEventListener("click", (e) => { if(e.target === modalOverlay) modalOverlay.classList.remove("show"); });
+  document.getElementById("confirmAdd").addEventListener("click", () => {
+    const name = document.getElementById("newName").value.trim();
+    const birth = document.getElementById("newBirth").value.trim();
+    if(!name) return;
+    const id = uid();
+    patients.push({ id, name, birth });
+    records[id] = {};
+    modalOverlay.classList.remove("show");
+    renderPatientList();
+    selectPatient(id);
+  });
+  document.getElementById("backupBtn").addEventListener("click", () => {
+    downloadJSON(`backup_pacientes_${new Date().toISOString().slice(0,10)}.json`, { patients, records });
+  });
+  document.getElementById("loadFileInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if(parsed.patients && parsed.records){
+          parsed.patients.forEach(p => { if(!patients.find(x => x.id === p.id)) patients.push(p); });
+          Object.keys(parsed.records).forEach(id => { records[id] = Object.assign({}, records[id]||{}, parsed.records[id]); });
+        } else if(parsed.paciente && parsed.etapa){
+          if(!patients.find(p => p.id === parsed.paciente)){
+            patients.push({ id: parsed.paciente, name: parsed.paciente, birth: "" });
+          }
+          records[parsed.paciente] = records[parsed.paciente] || {};
+          if(parsed.etapa === "objetivos") records[parsed.paciente].objetivos = parsed.dados;
+          else if(parsed.etapa === "bia") records[parsed.paciente].bia = parsed.dados;
+          else if(parsed.etapa === "perfil") records[parsed.paciente].perfil = parsed.dados;
+          else if(parsed.etapa === "esportiva") records[parsed.paciente].esportiva = parsed.dados;
+          else if(parsed.etapa === "perimenopausa") records[parsed.paciente].perimenopausa = parsed.dados;
+          else if(parsed.etapa === "suplementacao") records[parsed.paciente].suplementacao = parsed.dados;
+          else if(parsed.etapa === "fadiga") records[parsed.paciente].fadiga = parsed.dados;
+          else if(parsed.etapa === "calculadora") records[parsed.paciente].calculadora = parsed.dados;
+          else if(parsed.etapa === "orientacoes") records[parsed.paciente].orientacoes = parsed.dados;
+        }
+        renderPatientList(); renderMain();
+        alert("Arquivo carregado com sucesso.");
+      } catch(err){
+        alert("Não consegui ler esse arquivo — confirme se é um .json salvo por esta ferramenta.");
+      }
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  });
+  searchInput.addEventListener("input", renderPatientList);
+
+  renderPatientList();
+  renderMain();
+})();
+</script>
+</body>
+</html>
